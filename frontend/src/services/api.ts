@@ -9,9 +9,11 @@ const CONFIG_KEYS = {
 };
 
 export class ApiService {
-  // Hardcoded to real backend URL
   static getBaseUrl(): string {
-    return "http://localhost:8000";
+    if (import.meta.env.PROD) {
+      return ""; // Use relative paths on Vercel
+    }
+    return "http://localhost:8000"; // Local dev
   }
 
   // Obsolete function, retained for compatibility if called elsewhere
