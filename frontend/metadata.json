@@ -1,0 +1,6 @@
+{
+  "name": "Rawon TM POS",
+  "description": "Multi-app Point of Sale (POS) system for Rawon TM with Customer, Kitchen, Cashier, and Admin applications under Role-Based Access Control.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
