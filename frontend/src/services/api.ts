@@ -11,7 +11,7 @@ const CONFIG_KEYS = {
 export class ApiService {
   static getBaseUrl(): string {
     if (import.meta.env.PROD) {
-      return ""; // Use relative paths on Vercel
+      return "/api"; // Hit the Vercel Serverless Function at /api
     }
     return "http://localhost:8000"; // Local dev
   }
