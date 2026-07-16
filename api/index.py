@@ -16,8 +16,8 @@ import models
 import schemas
 import auth
 
-# Create all tables
-models.Base.metadata.create_all(bind=engine)
+
+
 
 app = FastAPI()
 
