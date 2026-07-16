@@ -12,7 +12,9 @@ if not db_url:
     raise ValueError("CRITICAL ERROR: DATABASE_URL environment variable is missing!")
 
 if db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql://", 1)
+    db_url = db_url.replace("postgres://", "postgresql+pg8000://", 1)
+elif db_url.startswith("postgresql://"):
+    db_url = db_url.replace("postgresql://", "postgresql+pg8000://", 1)
 
 engine = create_engine(db_url)
 
