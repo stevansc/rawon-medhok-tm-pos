@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timedelta
 from typing import Optional
 import jwt
@@ -6,13 +7,15 @@ from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
+from dotenv import load_dotenv
 from database import get_db
 import models
 
-# In a real app, load this from .env
-SECRET_KEY = "RAWON-TM-SUPER-SECRET-KEY" 
+load_dotenv(override=True)
+
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-only-rawon-tm-fallback")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 # 1 day
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 1 day
 
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -46,8 +49,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
             raise credentials_exception
     except JWTError:
         raise credentials_exception
-    
-    # We query the DB for the user
+
     user = db.query(models.User).filter(models.User.username == username).first()
     if user is None:
         raise credentials_exception

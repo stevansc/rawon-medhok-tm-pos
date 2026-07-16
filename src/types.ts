@@ -4,12 +4,13 @@ export interface User {
   id: number;
   username: string;
   role: UserRole;
-  branch_name: string;
+  branch_name: string | null;
 }
 
 export interface Branch {
   name: string;
-  tax_rate: number; // e.g. 0.10 for 10%
+  tax_rate: number;  // e.g. 0.10 for 10%
+  color_theme: string;  // e.g. 'teal', 'indigo', 'stone'
 }
 
 export interface MenuItem {
@@ -34,6 +35,7 @@ export interface OrderItemInput {
 
 export interface OrderItemDetail extends OrderItemInput {
   id?: number;
+  status?: string;
   menu_item: MenuItem;
 }
 
@@ -74,3 +76,15 @@ export interface DashboardAnalytics {
   total_profit: number;
   order_count: number;
 }
+
+export interface Promotion {
+  id: number;
+  title: string;
+  description: string | null;
+  image_url: string | null;
+  branch_name: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export const FALLBACK_IMAGE_URL = "https://images.unsplash.com/photo-1601050690597-df056fb4ce78?w=500&auto=format&fit=crop&q=60";

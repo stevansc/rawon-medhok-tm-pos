@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { MenuItem, OrderInput, Order, Branch } from "../types";
+import { MenuItem, OrderInput, Order, Branch, Promotion } from "../types";
 import { ApiService } from "../services/api";
 import { 
   ShoppingBag, Search, Plus, Minus, FileText, 
@@ -8,18 +8,20 @@ import {
 } from "lucide-react";
 
 interface CustomerAppProps {
-  branchNameQuery: string;
-  tableNumberQuery: string;
+  branchNameQuery?: string;
+  tableNumberQuery?: string;
 }
 
 export default function CustomerApp({ branchNameQuery, tableNumberQuery }: CustomerAppProps) {
-  const [selectedBranch, setSelectedBranch] = useState<string>(branchNameQuery || "Gayung Sari");
+  const [selectedBranch, setSelectedBranch] = useState<string>(branchNameQuery || "");
   const [tableNumber, setTableNumber] = useState<string>(tableNumberQuery || "5");
   const [customerName, setCustomerName] = useState<string>("");
   const [phoneNumber, setPhoneNumber] = useState<string>("");
   const [orderType, setOrderType] = useState<"dine-in" | "take-away">("dine-in");
   
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -55,13 +57,21 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
         setBranches(fetchedBranches);
         
         // If query is valid, use it; otherwise default to first branch
-        const finalBranch = branchNameQuery || fetchedBranches[0]?.name || "Gayung Sari";
-        setSelectedBranch(finalBranch);
+        const finalBranch = branchNameQuery || fetchedBranches[0]?.name || "";
+        if (finalBranch) {
+          setSelectedBranch(finalBranch);
+        }
         
-        const menu = await ApiService.getMenu(finalBranch);
+        const [menu, cats, promos] = await Promise.all([
+          ApiService.getMenu(finalBranch),
+          ApiService.getCategories(),
+          ApiService.getPromotions(finalBranch)
+        ]);
         setMenuItems(menu);
+        setCategories(cats);
+        setPromotions(promos);
       } catch (err: any) {
-        setErrorMessage(err.message || "Failed to load menu items.");
+        setErrorMessage(err.message || "Failed to load initial data.");
       } finally {
         setIsLoading(false);
       }
@@ -75,8 +85,12 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
       setIsLoading(true);
       setSelectedBranch(branchName);
       setCart([]); // Clear cart when changing branch to prevent menu mixups
-      const menu = await ApiService.getMenu(branchName, categoryFilter === "all" ? undefined : categoryFilter);
+      const [menu, promos] = await Promise.all([
+        ApiService.getMenu(branchName, categoryFilter === "all" ? undefined : categoryFilter),
+        ApiService.getPromotions(branchName)
+      ]);
       setMenuItems(menu);
+      setPromotions(promos);
     } catch (err: any) {
       setErrorMessage(err.message || "Failed to fetch branch menu");
     } finally {
@@ -166,7 +180,9 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
 
   // Subtotal and tax calculation
   const subtotal = cart.reduce((sum, c) => sum + c.item.price * c.quantity, 0);
-  const branchTaxRate = branches.find(b => b.name === selectedBranch)?.tax_rate || 0.10;
+  const activeBranch = branches.find(b => b.name === selectedBranch);
+  const branchTaxRate = activeBranch?.tax_rate || 0.10;
+  const theme = activeBranch?.color_theme === "indigo" ? "indigo" : "stone";
   const taxAmount = Math.round(subtotal * branchTaxRate);
   const totalAmount = subtotal + taxAmount;
   const totalCartCount = cart.reduce((sum, c) => sum + c.quantity, 0);
@@ -231,38 +247,38 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
     <div className="relative mx-auto max-w-md bg-stone-50 text-stone-900 min-h-screen shadow-2xl flex flex-col font-sans border-x border-stone-200">
       
       {/* Brand Header */}
-      <header className="sticky top-0 z-20 bg-stone-900 text-white p-4 border-b-4 border-orange-600 flex flex-col">
+      <header className={`sticky top-0 z-20 text-white p-4 border-b-4 flex flex-col ${theme === 'indigo' ? 'bg-indigo-900 border-emerald-500' : 'bg-stone-900 border-orange-600'}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="bg-orange-600 text-white w-8 h-8 flex items-center justify-center font-bold text-lg tracking-tighter">
+            <div className={`text-white w-8 h-8 flex items-center justify-center font-bold text-lg tracking-tighter ${theme === 'indigo' ? 'bg-emerald-500' : 'bg-orange-600'}`}>
               TM
             </div>
             <div>
               <h1 className="font-extrabold text-sm uppercase tracking-widest leading-none">Rawon TM</h1>
-              <p className="text-[9px] text-stone-400 font-mono mt-0.5">DINE-IN CUSTOMER APP</p>
+              <p className={`text-[9px] font-mono mt-0.5 ${theme === 'indigo' ? 'text-indigo-200' : 'text-stone-400'}`}>DINE-IN CUSTOMER APP</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-stone-800 px-3 py-1.5 rounded-none border border-stone-700 text-xs">
-            <MapPin className="w-3.5 h-3.5 text-orange-500" />
+          <div className="flex items-center gap-1.5 bg-black/30 px-3 py-1.5 rounded-none border border-white/10 text-xs">
+            <MapPin className={`w-3.5 h-3.5 ${theme === 'indigo' ? 'text-emerald-400' : 'text-orange-500'}`} />
             <span className="font-bold text-white uppercase tracking-wider text-[10px]">{selectedBranch}</span>
           </div>
         </div>
 
         {/* QR info details / mock table info */}
-        <div className="mt-3 flex items-center justify-between bg-stone-950/40 px-3 py-2 border border-stone-800 text-xs">
+        <div className="mt-3 flex items-center justify-between bg-black/40 px-3 py-2 border border-white/10 text-xs">
           <div className="flex items-center gap-1">
-            <span className="text-orange-500 font-mono font-bold uppercase tracking-wider">Table:</span>
+            <span className={`font-mono font-bold uppercase tracking-wider ${theme === 'indigo' ? 'text-emerald-400' : 'text-orange-500'}`}>Table:</span>
             <input 
               type="text" 
               value={tableNumber} 
               onChange={(e) => setTableNumber(e.target.value)} 
-              className="w-10 bg-transparent text-white border-b border-orange-600/50 font-bold focus:outline-none focus:border-orange-500 text-center font-mono"
+              className={`w-10 bg-transparent text-white border-b font-bold focus:outline-none text-center font-mono ${theme === 'indigo' ? 'border-emerald-500/50 focus:border-emerald-400' : 'border-orange-600/50 focus:border-orange-500'}`}
               placeholder="NO"
             />
           </div>
-          <div className="text-[10px] text-stone-300 font-mono uppercase tracking-wider flex items-center gap-1">
-            <Sparkles className="w-3 h-3 text-orange-500 animate-pulse" />
+          <div className="text-[10px] text-white/70 font-mono uppercase tracking-wider flex items-center gap-1">
+            <Sparkles className={`w-3 h-3 animate-pulse ${theme === 'indigo' ? 'text-emerald-400' : 'text-orange-500'}`} />
             <span>Active Session</span>
           </div>
         </div>
@@ -325,19 +341,23 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
           /* Normal Menu Browse & Order View */
           <div>
             {/* Quick Banner */}
-            <div className="relative bg-stone-900 text-white p-5 flex items-center justify-between overflow-hidden border-b-2 border-stone-900">
-              <div className="relative z-10 max-w-[70%]">
-                <span className="bg-orange-600 text-white font-extrabold text-[9px] px-2 py-0.5 uppercase tracking-wider font-mono">PROMO</span>
-                <h3 className="font-black text-sm uppercase tracking-wide mt-1.5 leading-snug">Legend Javanese Keluak Soup</h3>
-                <p className="text-[10px] text-stone-400 mt-1 font-mono leading-tight">Simmered slow for 12 hours for premium tenderness.</p>
+            {promotions.length > 0 && (
+              <div className="relative bg-stone-900 text-white p-5 flex items-center justify-between overflow-hidden border-b-2 border-stone-900">
+                <div className="relative z-10 max-w-[70%]">
+                  <span className="bg-orange-600 text-white font-extrabold text-[9px] px-2 py-0.5 uppercase tracking-wider font-mono">PROMO</span>
+                  <h3 className="font-black text-sm uppercase tracking-wide mt-1.5 leading-snug">{promotions[0].title}</h3>
+                  {promotions[0].description && (
+                    <p className="text-[10px] text-stone-400 mt-1 font-mono leading-tight">{promotions[0].description}</p>
+                  )}
+                </div>
+                <div className="absolute right-[-10px] bottom-[-15px] opacity-20 scale-100">
+                  <Sparkles className="w-24 h-24 text-orange-500" />
+                </div>
               </div>
-              <div className="absolute right-[-10px] bottom-[-15px] opacity-20 scale-100">
-                <Sparkles className="w-24 h-24 text-orange-500" />
-              </div>
-            </div>
+            )}
 
             {/* Branch Fallback Selector if not set in query */}
-            {!branchNameQuery && (
+            {!branchNameQuery && branches.length > 0 && (
               <div className="p-4 bg-stone-100 border-b border-stone-200 flex items-center justify-between">
                 <span className="text-xs font-bold text-stone-900 uppercase tracking-wider">Branch:</span>
                 <select 
@@ -345,8 +365,9 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
                   onChange={(e) => handleBranchChange(e.target.value)}
                   className="bg-white border border-stone-300 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-600 font-mono"
                 >
-                  <option value="Gayung Sari">Gayung Sari</option>
-                  <option value="Siwalankerto">Siwalankerto</option>
+                  {branches.map(b => (
+                    <option key={b.name} value={b.name}>{b.name}</option>
+                  ))}
                 </select>
               </div>
             )}
@@ -367,22 +388,27 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
 
             {/* Category Slider */}
             <div className="px-4 pb-2 flex gap-2 overflow-x-auto scrollbar-hide">
-              {[
-                { id: "all", label: "🍲 ALL ITEMS" },
-                { id: "food", label: "🍖 MAIN DISHES" },
-                { id: "drink", label: "🍹 DRINKS" },
-                { id: "other", label: "🥚 SIDES" }
-              ].map(cat => (
+              <button
+                onClick={() => setCategoryFilter("all")}
+                className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all ${
+                  categoryFilter === "all" 
+                    ? "bg-orange-600 text-white shadow-sm" 
+                    : "bg-stone-200 text-stone-600 hover:bg-stone-300"
+                }`}
+              >
+                🍲 ALL ITEMS
+              </button>
+              {categories.map(cat => (
                 <button
-                  key={cat.id}
-                  onClick={() => setCategoryFilter(cat.id)}
+                  key={cat}
+                  onClick={() => setCategoryFilter(cat)}
                   className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all ${
-                    categoryFilter === cat.id 
+                    categoryFilter === cat
                       ? "bg-orange-600 text-white shadow-sm" 
                       : "bg-stone-200 text-stone-600 hover:bg-stone-300"
                   }`}
                 >
-                  {cat.label}
+                  {cat.toUpperCase()}
                 </button>
               ))}
             </div>

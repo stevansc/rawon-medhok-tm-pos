@@ -6,23 +6,23 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
-class TokenData(BaseModel):
-    username: Optional[str] = None
-
 class UserBase(BaseModel):
     username: str
     role: str
 
 class UserCreate(UserBase):
     password: str
+    branch_name: Optional[str] = None
 
 class UserResponse(UserBase):
     id: int
+    branch_name: Optional[str] = None
     model_config = {"from_attributes": True}
 
 class BranchBase(BaseModel):
     name: str
     tax_rate: float
+    color_theme: str = "stone"
 
 class BranchResponse(BranchBase):
     model_config = {"from_attributes": True}
@@ -62,7 +62,7 @@ class OrderCreate(BaseModel):
     table_number: int
     customer_name: Optional[str] = None
     phone_number: Optional[str] = None
-    order_type: str 
+    order_type: str
     branch_name: str
     items: List[OrderItemCreate]
 
@@ -94,7 +94,7 @@ class OrderResponse(BaseModel):
 
 class OrderStatusUpdate(BaseModel):
     status: str
-    payment_method: Optional[str] = None 
+    payment_method: Optional[str] = None
 
 class DashboardResponse(BaseModel):
     branch_name: Optional[str] = None
@@ -116,3 +116,18 @@ class DishPerformanceResponse(BaseModel):
     profit: float
     marginPercent: int
     topAddon: str
+
+class PromotionBase(BaseModel):
+    title: str
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+    branch_name: Optional[str] = None
+    is_active: bool = True
+
+class PromotionCreate(PromotionBase):
+    pass
+
+class PromotionResponse(PromotionBase):
+    id: int
+    created_at: datetime
+    model_config = {"from_attributes": True}

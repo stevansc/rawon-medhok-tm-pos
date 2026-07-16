@@ -1,15 +1,11 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, useParams, Link } from "react-router-dom";
 import CustomerApp from "./apps/CustomerApp";
 import KitchenApp from "./apps/KitchenApp";
 import CashierApp from "./apps/CashierApp";
 import AdminApp from "./apps/AdminApp";
 import { ChefHat, Banknote, ShieldAlert, Smartphone } from "lucide-react";
+import { ApiService } from "./services/api";
 
 // Wrapper components to extract URL parameters and pass as props
 function CustomerWrapper() {
@@ -19,54 +15,63 @@ function CustomerWrapper() {
 
 function KitchenWrapper() {
   const { branchName } = useParams();
-  return <KitchenApp currentBranch={branchName} />;
+  return <KitchenApp currentBranch={branchName || ""} />;
 }
 
 function CashierWrapper() {
   const { branchName } = useParams();
-  return <CashierApp currentBranch={branchName} />;
+  return <CashierApp currentBranch={branchName || ""} />;
 }
 
 // Simple directory landing page
 function AppDirectory() {
-  const defaultBranch = "Gayung Sari"; // We can default to Gayung Sari for quick links
+  const [defaultBranch, setDefaultBranch] = useState("");
+
+  useEffect(() => {
+    ApiService.getBranches().then(branches => {
+      if (branches.length > 0) {
+        setDefaultBranch(branches[0].name);
+      }
+    }).catch(() => {});
+  }, []);
+
   return (
-    <div className="min-h-screen bg-stone-50 flex items-center justify-center p-6">
+    <div className="min-h-screen bg-stone-50 flex items-center justify-center p-6 font-sans">
       <div className="max-w-4xl w-full">
-        <h1 className="text-3xl font-bold text-stone-800 mb-2 text-center">Rawon TM POS System</h1>
-        <p className="text-stone-500 text-center mb-8">Select an application portal to begin.</p>
+        <h1 className="text-3xl font-black text-stone-900 mb-2 text-center uppercase tracking-tight">Rawon TM POS System</h1>
+        <p className="text-stone-500 text-center mb-8 font-mono text-sm uppercase">Select an application portal to begin.</p>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Link to={`/customer/${defaultBranch}/5`} className="bg-white p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow border border-stone-200 flex flex-col items-center text-center group">
-            <div className="w-16 h-16 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Link to={`/customer/${defaultBranch}/5`} className="bg-white p-6 rounded-none shadow-[4px_4px_0px_0px_rgba(0,0,0,0.9)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,0.9)] transition-all border-2 border-stone-900 flex flex-col items-center text-center group active:scale-95">
+            <div className="w-16 h-16 bg-orange-100 text-orange-600 rounded-none border border-orange-200 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
               <Smartphone size={32} />
             </div>
-            <h2 className="text-xl font-bold text-stone-800 mb-1">Customer</h2>
-            <p className="text-sm text-stone-500">Public menu & ordering</p>
+            <h2 className="text-xl font-black text-stone-900 mb-1 uppercase tracking-wide">Customer</h2>
+            <p className="text-[10px] text-stone-500 font-mono uppercase">Public menu & ordering</p>
           </Link>
           
-          <Link to={`/kitchen/${defaultBranch}`} className="bg-white p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow border border-stone-200 flex flex-col items-center text-center group">
-            <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+          <Link to={`/kitchen/${defaultBranch}`} className="bg-white p-6 rounded-none shadow-[4px_4px_0px_0px_rgba(0,0,0,0.9)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,0.9)] transition-all border-2 border-stone-900 flex flex-col items-center text-center group active:scale-95">
+            <div className="w-16 h-16 bg-red-100 text-red-600 rounded-none border border-red-200 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
               <ChefHat size={32} />
             </div>
-            <h2 className="text-xl font-bold text-stone-800 mb-1">Kitchen</h2>
-            <p className="text-sm text-stone-500">Order ticket management</p>
+            <h2 className="text-xl font-black text-stone-900 mb-1 uppercase tracking-wide">Kitchen</h2>
+            <p className="text-[10px] text-stone-500 font-mono uppercase">Order ticket management</p>
           </Link>
           
-          <Link to={`/cashier/${defaultBranch}`} className="bg-white p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow border border-stone-200 flex flex-col items-center text-center group">
-            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+          <Link to={`/cashier/${defaultBranch}`} className="bg-white p-6 rounded-none shadow-[4px_4px_0px_0px_rgba(0,0,0,0.9)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,0.9)] transition-all border-2 border-stone-900 flex flex-col items-center text-center group active:scale-95">
+            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-none border border-emerald-200 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
               <Banknote size={32} />
             </div>
-            <h2 className="text-xl font-bold text-stone-800 mb-1">Cashier</h2>
-            <p className="text-sm text-stone-500">Payments & fulfillment</p>
+            <h2 className="text-xl font-black text-stone-900 mb-1 uppercase tracking-wide">Cashier</h2>
+            <p className="text-[10px] text-stone-500 font-mono uppercase">Payments & fulfillment</p>
           </Link>
           
-          <Link to="/admin" className="bg-white p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow border border-stone-200 flex flex-col items-center text-center group">
-            <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+          <Link to="/admin" className="bg-white p-6 rounded-none shadow-[4px_4px_0px_0px_rgba(0,0,0,0.9)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,0.9)] transition-all border-2 border-stone-900 flex flex-col items-center text-center group active:scale-95">
+            <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-none border border-indigo-200 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
               <ShieldAlert size={32} />
             </div>
-            <h2 className="text-xl font-bold text-stone-800 mb-1">Admin HQ</h2>
-            <p className="text-sm text-stone-500">Global configuration</p>
+            <h2 className="text-xl font-black text-stone-900 mb-1 uppercase tracking-wide">Admin HQ</h2>
+            <p className="text-[10px] text-stone-500 font-mono uppercase">Global configuration</p>
           </Link>
         </div>
       </div>
@@ -79,9 +84,9 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<AppDirectory />} />
-        <Route path="/customer/:branchName/:tableNumber?" element={<CustomerWrapper />} />
-        <Route path="/kitchen/:branchName" element={<KitchenWrapper />} />
-        <Route path="/cashier/:branchName" element={<CashierWrapper />} />
+        <Route path="/customer/:branchName?/:tableNumber?" element={<CustomerWrapper />} />
+        <Route path="/kitchen/:branchName?" element={<KitchenWrapper />} />
+        <Route path="/cashier/:branchName?" element={<CashierWrapper />} />
         <Route path="/admin" element={<AdminApp />} />
       </Routes>
     </BrowserRouter>

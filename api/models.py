@@ -10,12 +10,14 @@ class User(Base):
     username = Column(String, unique=True, index=True)
     password_hash = Column(String)
     role = Column(String)  # 'admin', 'cashier', 'kitchen'
+    branch_name = Column(String, ForeignKey('branches.name'), nullable=True)
 
 class Branch(Base):
     __tablename__ = 'branches'
 
     name = Column(String, primary_key=True)
-    tax_rate = Column(Float, default=0.0) # e.g. 0.10 for 10%
+    tax_rate = Column(Float, default=0.0)  # e.g. 0.10 for 10%
+    color_theme = Column(String, default='stone')  # e.g. 'teal', 'indigo', 'stone'
 
 class MenuCategory(Base):
     __tablename__ = 'menu_categories'
@@ -27,10 +29,10 @@ class MenuItem(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String)
-    cost = Column(Numeric(10, 2))  
-    price = Column(Numeric(10, 2)) 
+    cost = Column(Numeric(10, 2))
+    price = Column(Numeric(10, 2))
     stock_count = Column(Integer, default=0)
-    category = Column(String)      
+    category = Column(String)
     description = Column(String, nullable=True)
     image_url = Column(String, nullable=True)
     is_available = Column(Boolean, default=True)
@@ -44,9 +46,9 @@ class Order(Base):
     table_number = Column(Integer)
     customer_name = Column(String, nullable=True)
     phone_number = Column(String, nullable=True)
-    order_type = Column(String) # 'dine-in', 'takeaway'
-    payment_method = Column(String, nullable=True) # 'Cash', 'QRIS', 'Debit', etc.
-    status = Column(String, default='pending') 
+    order_type = Column(String)  # 'dine-in', 'takeaway'
+    payment_method = Column(String, nullable=True)  # 'Cash', 'QRIS', 'Debit'
+    status = Column(String, default='pending')
     total_amount = Column(Numeric(10, 2), default=0.00)
     tax_amount = Column(Numeric(10, 2), default=0.00)
     branch_name = Column(String, ForeignKey('branches.name'))
@@ -62,7 +64,18 @@ class OrderItem(Base):
     menu_item_id = Column(Integer, ForeignKey('menu_items.id'))
     quantity = Column(Integer, default=1)
     special_notes = Column(String, nullable=True)
-    status = Column(String, default='pending') # pending, declined
+    status = Column(String, default='pending')  # pending, declined
 
     order = relationship("Order", back_populates="items")
     menu_item = relationship("MenuItem")
+
+class Promotion(Base):
+    __tablename__ = 'promotions'
+
+    id = Column(Integer, primary_key=True)
+    title = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    image_url = Column(String, nullable=True)
+    branch_name = Column(String, ForeignKey('branches.name'), nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)

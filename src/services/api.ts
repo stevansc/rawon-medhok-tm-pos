@@ -1,6 +1,6 @@
-import { 
-  User, MenuItem, Order, OrderInput, OrderStatus, 
-  TokenResponse, DashboardAnalytics, Branch, UserRole 
+import {
+  User, MenuItem, Order, OrderInput, OrderStatus,
+  TokenResponse, DashboardAnalytics, Branch, Promotion
 } from "../types";
 
 const CONFIG_KEYS = {
@@ -11,11 +11,6 @@ const CONFIG_KEYS = {
 export class ApiService {
   static getBaseUrl(): string {
     return "/api";
-  }
-
-  // Obsolete function, retained for compatibility if called elsewhere
-  static getMode(): "real" | "mock" {
-    return "real";
   }
 
   static getToken(): string | null {
@@ -39,13 +34,16 @@ export class ApiService {
 
   // --- Core API Helpers ---
   private static async request<T>(
-    endpoint: string, 
+    endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
     const baseUrl = this.getBaseUrl();
     const token = this.getToken();
 
     const headers: Record<string, string> = {
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+      "Pragma": "no-cache",
+      "Expires": "0",
       ...(options.headers as Record<string, string>)
     };
 
@@ -73,7 +71,7 @@ export class ApiService {
   }
 
   // --- Authentication Flow ---
-  static async login(username: string, password: string): Promise<TokenResponse> {
+  static async login(username: string, password: string): Promise<User> {
     const formData = new URLSearchParams();
     formData.append("username", username);
     formData.append("password", password);
@@ -101,30 +99,16 @@ export class ApiService {
     const tokenData = (await response.json()) as TokenResponse;
     localStorage.setItem(CONFIG_KEYS.TOKEN, tokenData.access_token);
 
-    let role: UserRole = "kitchen";
-    if (username.toLowerCase().includes("admin")) {
-      role = "admin";
-    } else if (username.toLowerCase().includes("cashier")) {
-      role = "cashier";
-    }
-
-    const branchName = username.toLowerCase().includes("siwalankerto") ? "Siwalankerto" : "Gayung Sari";
-
-    const userDetails: User = {
-      id: Math.floor(Math.random() * 1000),
-      username,
-      role,
-      branch_name: branchName
-    };
-
-    localStorage.setItem(CONFIG_KEYS.USER, JSON.stringify(userDetails));
-    return tokenData;
+    // Fetch real user profile from backend instead of guessing from username
+    const userProfile = await this.request<User>("/users/me");
+    localStorage.setItem(CONFIG_KEYS.USER, JSON.stringify(userProfile));
+    return userProfile;
   }
 
   // --- Menu Management ---
   static async getMenu(branchName?: string, category?: string, search?: string): Promise<MenuItem[]> {
     const params = new URLSearchParams();
-    if (branchName && branchName !== "all" && branchName !== "All Branches") {
+    if (branchName && branchName !== "all") {
       params.append("branch_name", branchName);
     }
     if (category && category !== "all") {
@@ -142,9 +126,7 @@ export class ApiService {
   static async createOrder(orderInput: OrderInput): Promise<Order> {
     return this.request<Order>("/orders/", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(orderInput)
     });
   }
@@ -158,8 +140,8 @@ export class ApiService {
   }
 
   static async updateOrderStatus(
-    orderId: number, 
-    status: OrderStatus, 
+    orderId: number,
+    status: OrderStatus,
     paymentMethod?: "Cash" | "QRIS" | "Debit"
   ): Promise<Order> {
     const payload: Record<string, string> = { status };
@@ -169,28 +151,28 @@ export class ApiService {
 
     return this.request<Order>(`/orders/${orderId}/status`, {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
   }
 
-  // --- Admin App Dashboard & Branch/Menu Management ---
-  static async getDashboardAnalytics(branchName?: string): Promise<DashboardAnalytics> {
-    let url = "/dashboard/";
-    if (branchName) {
-      url += `?branch_name=${encodeURIComponent(branchName)}`;
-    }
-    return this.request<DashboardAnalytics>(url);
+  // --- Admin Dashboard & Management ---
+  static async getDashboardAnalytics(branchName?: string, startDate?: string, endDate?: string): Promise<DashboardAnalytics> {
+    const params = new URLSearchParams();
+    if (branchName) params.append("branch_name", branchName);
+    if (startDate) params.append("start_date", startDate);
+    if (endDate) params.append("end_date", endDate);
+    const qs = params.toString();
+    return this.request<DashboardAnalytics>(`/dashboard/${qs ? `?${qs}` : ""}`);
   }
 
-  static async getDishPerformance(branchName?: string): Promise<any[]> {
-    let url = "/admin/dish-performance";
-    if (branchName) {
-      url += `?branch_name=${encodeURIComponent(branchName)}`;
-    }
-    return this.request<any[]>(url);
+  static async getDishPerformance(branchName?: string, startDate?: string, endDate?: string): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (branchName) params.append("branch_name", branchName);
+    if (startDate) params.append("start_date", startDate);
+    if (endDate) params.append("end_date", endDate);
+    const qs = params.toString();
+    return this.request<any[]>(`/admin/dish-performance${qs ? `?${qs}` : ""}`);
   }
 
   static async getBranches(): Promise<Branch[]> {
@@ -220,9 +202,9 @@ export class ApiService {
       body: JSON.stringify(item)
     });
   }
-  
-  static async declineOrderItem(orderId: number, menuItemId: number, specialNotes: string): Promise<Order> {
-    return this.request<Order>(`/orders/${orderId}/items/${menuItemId}/decline`, {
+
+  static async declineOrderItem(orderId: number, itemId: number): Promise<Order> {
+    return this.request<Order>(`/orders/${orderId}/items/${itemId}/decline`, {
       method: "POST"
     });
   }
@@ -235,15 +217,35 @@ export class ApiService {
   static async addCategory(categoryName: string): Promise<string[]> {
     const cleanCat = categoryName.trim().toLowerCase();
     if (!cleanCat) return [];
-    
+
     return this.request<string[]>("/categories", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: cleanCat })
     });
   }
-  
+
   static async updateBranch(oldName: string, updatedBranch: Branch): Promise<Branch> {
-    return updatedBranch;
+    return this.request<Branch>(`/branches/${encodeURIComponent(oldName)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updatedBranch)
+    });
+  }
+
+  // --- Promotions ---
+  static async getPromotions(branchName?: string): Promise<Promotion[]> {
+    const params = new URLSearchParams();
+    if (branchName) params.append("branch_name", branchName);
+    const qs = params.toString();
+    return this.request<Promotion[]>(`/promotions${qs ? `?${qs}` : ""}`);
+  }
+
+  static async createPromotion(promo: Omit<Promotion, "id" | "created_at">): Promise<Promotion> {
+    return this.request<Promotion>("/promotions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(promo)
+    });
   }
 }
