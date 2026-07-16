@@ -5,7 +5,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'backend')))
 
 from fastapi import FastAPI
-from main import app as backend_app
+from main import app as backend_app  # type: ignore
 
 # Create a master FastAPI app for Vercel
 app = FastAPI()
