@@ -5,16 +5,16 @@ from sqlalchemy import create_engine
 load_dotenv(override=True)
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-# Fallback to SQLite if no DATABASE_URL is provided in the environment
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./restaurant_pos.db")
+# STRICTLY REQUIRE DATABASE_URL for Vercel Serverless
+# and fix Supabase's deprecated postgres:// schema if it exists
+db_url = os.getenv("DATABASE_URL")
+if not db_url:
+    raise ValueError("CRITICAL ERROR: DATABASE_URL environment variable is missing!")
 
-# If using SQLite, we need connect_args={"check_same_thread": False}
-if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
-    engine = create_engine(
-        SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-    )
-else:
-    engine = create_engine(SQLALCHEMY_DATABASE_URL)
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+engine = create_engine(db_url)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
