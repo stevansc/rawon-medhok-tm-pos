@@ -265,10 +265,18 @@ def get_dish_performance(branch_name: Optional[str] = None, db: Session = Depend
         FROM menu_items m
         LEFT JOIN order_items oi ON oi.menu_item_id = m.id
         LEFT JOIN orders o ON o.id = oi.order_id AND o.status = 'completed'
-        WHERE (:branch_name IS NULL OR m.branch_name = :branch_name)
-        GROUP BY m.id
     """
-    results = db.execute(text(query), {"branch_name": branch_name}).fetchall()
+    
+    if branch_name:
+        query += " WHERE m.branch_name = :branch_name "
+        
+    query += " GROUP BY m.id "
+    
+    params = {}
+    if branch_name:
+        params["branch_name"] = branch_name
+        
+    results = db.execute(text(query), params).fetchall()
     
     performance_data = []
     for r in results:
