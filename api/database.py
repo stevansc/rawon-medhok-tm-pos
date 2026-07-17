@@ -15,13 +15,11 @@ if not db_url:
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
 
-# NullPool: Each request gets a fresh connection and releases it immediately.
-# This is the correct strategy for serverless (Vercel) where persistent pools
-# cause leaked connections across cold starts.
+# By default, SQLAlchemy uses QueuePool which keeps connections alive.
+# This prevents the 1.5s+ TCP/SSL handshake penalty on every single request.
+# Ensure you are using the Supabase Connection Pooler URL (port 6543) in production.
 engine = create_engine(
     db_url,
-    poolclass=NullPool,
-    pool_pre_ping=True,
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

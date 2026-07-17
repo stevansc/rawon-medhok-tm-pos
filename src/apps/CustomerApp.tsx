@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { MenuItem, OrderInput, Order, Branch, Promotion } from "../types";
 import { ApiService } from "../services/api";
 import { 
@@ -40,6 +40,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
   const [isSubmittingOrder, setIsSubmittingOrder] = useState<boolean>(false);
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const lastFetched = useRef({ branch: "", category: "all", search: "" });
 
   // Popup states for customizable menu item selection
   const [activePopupItem, setActivePopupItem] = useState<MenuItem | null>(null);
@@ -70,6 +71,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
         setMenuItems(menu);
         setCategories(cats);
         setPromotions(promos);
+        lastFetched.current = { branch: finalBranch, category: "all", search: "" };
       } catch (err: any) {
         setErrorMessage(err.message || "Failed to load initial data.");
       } finally {
@@ -102,6 +104,14 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
   useEffect(() => {
     async function filterMenu() {
       if (!selectedBranch) return;
+      if (
+        lastFetched.current.branch === selectedBranch &&
+        lastFetched.current.category === categoryFilter &&
+        lastFetched.current.search === searchQuery
+      ) {
+        return;
+      }
+      lastFetched.current = { branch: selectedBranch, category: categoryFilter, search: searchQuery };
       try {
         setIsLoading(true);
         const menu = await ApiService.getMenu(

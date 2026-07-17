@@ -3,7 +3,7 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 from typing import List, Optional
-from fastapi import FastAPI, Depends, HTTPException, Query, status
+from fastapi import FastAPI, Depends, HTTPException, Query, status, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session, joinedload
@@ -83,7 +83,8 @@ def create_branch(branch: schemas.BranchBase, db: Session = Depends(get_db), cur
     return db_branch
 
 @app.get("/api/branches/", response_model=List[schemas.BranchResponse])
-def get_branches(db: Session = Depends(get_db)):
+def get_branches(response: Response, db: Session = Depends(get_db)):
+    response.headers["Cache-Control"] = "public, max-age=60, s-maxage=60, stale-while-revalidate=86400"
     return db.query(models.Branch).all()
 
 @app.put("/api/branches/{branch_name}", response_model=schemas.BranchResponse)
@@ -104,7 +105,8 @@ def update_branch(branch_name: str, branch: schemas.BranchBase, db: Session = De
 
 # --- CATEGORIES ---
 @app.get("/api/categories", response_model=List[schemas.MenuCategoryResponse])
-def get_categories(db: Session = Depends(get_db)):
+def get_categories(response: Response, db: Session = Depends(get_db)):
+    response.headers["Cache-Control"] = "public, max-age=60, s-maxage=60, stale-while-revalidate=86400"
     return db.query(models.MenuCategory).all()
 
 @app.post("/api/categories", response_model=List[str])
@@ -120,11 +122,13 @@ def create_category(category: schemas.MenuCategoryBase, db: Session = Depends(ge
 # --- MENU ---
 @app.get("/api/menu/", response_model=List[schemas.MenuItemResponse])
 def get_menu(
+    response: Response,
     branch_name: Optional[str] = None,
     category: Optional[str] = None,
     search: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
+    response.headers["Cache-Control"] = "public, max-age=60, s-maxage=60, stale-while-revalidate=86400"
     query = db.query(models.MenuItem)
     if branch_name:
         query = query.filter(models.MenuItem.branch_name == branch_name)
@@ -152,7 +156,6 @@ def update_menu_item(item_id: int, item: schemas.MenuItemCreate, db: Session = D
         setattr(db_item, key, value)
 
     db.commit()
-    db.refresh(db_item)
     return db_item
 
 @app.delete("/api/menu/{item_id}")
@@ -411,7 +414,8 @@ def get_dashboard(
 
 # --- PROMOTIONS ---
 @app.get("/api/promotions", response_model=List[schemas.PromotionResponse])
-def get_promotions(branch_name: Optional[str] = None, db: Session = Depends(get_db)):
+def get_promotions(response: Response, branch_name: Optional[str] = None, db: Session = Depends(get_db)):
+    response.headers["Cache-Control"] = "public, max-age=60, s-maxage=60, stale-while-revalidate=86400"
     query = db.query(models.Promotion).filter(models.Promotion.is_active == True)
     if branch_name:
         # Return promos for this branch + global promos (branch_name IS NULL)

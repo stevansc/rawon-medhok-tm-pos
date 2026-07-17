@@ -35,17 +35,20 @@ export class ApiService {
   // --- Core API Helpers ---
   private static async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit & { useCache?: boolean } = {}
   ): Promise<T> {
     const baseUrl = this.getBaseUrl();
     const token = this.getToken();
 
     const headers: Record<string, string> = {
-      "Cache-Control": "no-cache, no-store, must-revalidate",
-      "Pragma": "no-cache",
-      "Expires": "0",
       ...(options.headers as Record<string, string>)
     };
+
+    if (!options.useCache) {
+      headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+      headers["Pragma"] = "no-cache";
+      headers["Expires"] = "0";
+    }
 
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
@@ -119,7 +122,7 @@ export class ApiService {
     }
     const qs = params.toString();
     const url = `/menu/${qs ? `?${qs}` : ""}`;
-    return this.request<MenuItem[]>(url);
+    return this.request<MenuItem[]>(url, { useCache: true });
   }
 
   // --- Order Placement & Management ---
@@ -176,7 +179,7 @@ export class ApiService {
   }
 
   static async getBranches(): Promise<Branch[]> {
-    return this.request<Branch[]>("/branches/");
+    return this.request<Branch[]>("/branches/", { useCache: true });
   }
 
   static async createBranch(branch: Branch): Promise<Branch> {
@@ -210,7 +213,7 @@ export class ApiService {
   }
 
   static async getCategories(): Promise<string[]> {
-    const cats = await this.request<{name: string, created_at: string}[]>("/categories");
+    const cats = await this.request<{name: string, created_at: string}[]>("/categories", { useCache: true });
     return cats.map(c => c.name);
   }
 
@@ -238,7 +241,7 @@ export class ApiService {
     const params = new URLSearchParams();
     if (branchName) params.append("branch_name", branchName);
     const qs = params.toString();
-    return this.request<Promotion[]>(`/promotions${qs ? `?${qs}` : ""}`);
+    return this.request<Promotion[]>(`/promotions${qs ? `?${qs}` : ""}`, { useCache: true });
   }
 
   static async createPromotion(promo: Omit<Promotion, "id" | "created_at">): Promise<Promotion> {

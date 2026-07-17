@@ -94,19 +94,19 @@ export default function AdminApp() {
 
       const { startDate, endDate } = getDateRange();
 
-      const [fetchedAnalytics, fetchedBranches, fetchedMenu, fetchedCats, fetchedPerformance] = await Promise.all([
+      const [fetchedAnalytics, fetchedPerformance, fetchedMenu, fetchedBranches, fetchedCats] = await Promise.all([
         ApiService.getDashboardAnalytics(selectedBranchFilter || undefined, startDate, endDate),
-        ApiService.getBranches(),
+        ApiService.getDishPerformance(selectedBranchFilter || undefined, startDate, endDate),
         ApiService.getMenu(selectedBranchFilter || undefined),
-        ApiService.getCategories(),
-        ApiService.getDishPerformance(selectedBranchFilter || undefined, startDate, endDate)
+        branches.length === 0 ? ApiService.getBranches() : Promise.resolve(branches),
+        categories.length === 0 ? ApiService.getCategories() : Promise.resolve(categories)
       ]);
 
       setAnalytics(fetchedAnalytics);
-      setBranches(fetchedBranches);
-      setMenuItems(fetchedMenu);
-      setCategories(fetchedCats);
       setDishPerformance(fetchedPerformance);
+      setMenuItems(fetchedMenu);
+      if (branches.length === 0) setBranches(fetchedBranches);
+      if (categories.length === 0) setCategories(fetchedCats);
 
       if (!menuFormBranch && fetchedBranches.length > 0) {
         setMenuFormBranch(fetchedBranches[0].name);
@@ -132,13 +132,13 @@ export default function AdminApp() {
     try {
       setError(null);
       const rate = parseFloat(newBranchTax) / 100;
-      await ApiService.createBranch({
+      const newBranch = await ApiService.createBranch({
         name: newBranchName,
         tax_rate: isNaN(rate) ? 0.10 : rate,
         color_theme: newBranchColor
       });
       setNewBranchName("");
-      loadAdminData();
+      setBranches(prev => [...prev, newBranch]);
       alert("New branch configured successfully.");
     } catch (err: any) {
       alert(`Failed to configure branch: ${err.message}`);
@@ -159,8 +159,8 @@ export default function AdminApp() {
         stock_count: item.stock_count,
         cost: item.cost
       };
-      await ApiService.updateMenuItem(item.id, updatedItem);
-      loadAdminData();
+      const savedItem = await ApiService.updateMenuItem(item.id, updatedItem);
+      setMenuItems(prev => prev.map(m => m.id === savedItem.id ? savedItem : m));
     } catch (err: any) {
       alert(`Failed to update item state: ${err.message}`);
     }
@@ -207,14 +207,15 @@ export default function AdminApp() {
     try {
       setError(null);
       if (editingMenuItem) {
-        await ApiService.updateMenuItem(editingMenuItem.id, payload);
+        const savedItem = await ApiService.updateMenuItem(editingMenuItem.id, payload);
+        setMenuItems(prev => prev.map(m => m.id === savedItem.id ? savedItem : m));
         alert("Dish updated successfully.");
       } else {
-        await ApiService.createMenuItem(payload);
+        const newItem = await ApiService.createMenuItem(payload);
+        setMenuItems(prev => [...prev, newItem]);
         alert("New dish added successfully.");
       }
       resetMenuForm();
-      loadAdminData();
     } catch (err: any) {
       alert(`Menu modification failed: ${err.message}`);
     }
@@ -260,13 +261,13 @@ export default function AdminApp() {
     if (!editingBranch || !branchFormName.trim()) return;
     try {
       const taxRate = parseFloat(branchFormTax) / 100;
-      await ApiService.updateBranch(editingBranch.name, {
+      const savedBranch = await ApiService.updateBranch(editingBranch.name, {
         name: branchFormName.trim(),
         tax_rate: isNaN(taxRate) ? 0.10 : taxRate,
         color_theme: branchFormColor
       });
       setEditingBranch(null);
-      loadAdminData();
+      setBranches(prev => prev.map(b => b.name === editingBranch.name ? savedBranch : b));
       alert("Branch details updated successfully.");
     } catch (err: any) {
       alert(`Failed to update branch: ${err.message}`);
