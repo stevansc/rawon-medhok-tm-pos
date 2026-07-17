@@ -16,10 +16,13 @@ if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
 
 # By default, SQLAlchemy uses QueuePool which keeps connections alive.
-# This prevents the 1.5s+ TCP/SSL handshake penalty on every single request.
-# Ensure you are using the Supabase Connection Pooler URL (port 6543) in production.
+# This prevents the 1.5s+ TCP/SSL handshake penalty locally.
+# However, for Vercel Serverless, we MUST use NullPool to prevent connection drops/hangs.
+is_vercel = os.getenv("VERCEL") == "1"
+
 engine = create_engine(
     db_url,
+    poolclass=NullPool if is_vercel else None,
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
