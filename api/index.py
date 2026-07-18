@@ -128,7 +128,7 @@ def get_menu(
     search: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    response.headers["Cache-Control"] = "public, max-age=60, s-maxage=60, stale-while-revalidate=86400"
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     query = db.query(models.MenuItem).options(
         joinedload(models.MenuItem.ingredients).joinedload(models.MenuItemIngredient.ingredient)
     )
@@ -141,12 +141,13 @@ def get_menu(
         
     menu_items = query.order_by(models.MenuItem.sort_order.asc()).all()
     for item in menu_items:
-        if not item.ingredients:
-            item.stock_count = 0
+        valid_ingredients = [m for m in item.ingredients if m.required_qty > 0]
+        if not valid_ingredients:
+            item.stock_count = None
         else:
             item.stock_count = int(min(
                 (mapping.ingredient.stock_qty // mapping.required_qty)
-                for mapping in item.ingredients if mapping.required_qty > 0
+                for mapping in valid_ingredients
             ))
             
     return menu_items
@@ -282,11 +283,19 @@ def create_order(order: schemas.OrderCreate, db: Session = Depends(get_db)):
     tax_amount = float(total_price) * float(branch.tax_rate)
     db_order.tax_amount = tax_amount
     db_order.total_amount = float(total_price) + tax_amount
+    
+    from datetime import timezone, timedelta
+    jkt_tz = timezone(timedelta(hours=7))
+    now_jkt = datetime.now(jkt_tz)
+    start_of_today = now_jkt.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_of_today = start_of_today + timedelta(days=1)
+    start_utc = start_of_today.astimezone(timezone.utc).replace(tzinfo=None)
+    end_utc = end_of_today.astimezone(timezone.utc).replace(tzinfo=None)
 
-    today = datetime.utcnow().date()
     max_daily = db.query(func.max(models.Order.daily_order_number)).filter(
         models.Order.branch_name == order.branch_name,
-        cast(models.Order.created_at, Date) == today
+        models.Order.created_at >= start_utc,
+        models.Order.created_at < end_utc
     ).scalar()
     
     db_order.daily_order_number = (max_daily + 1) if max_daily else 31
@@ -506,10 +515,18 @@ def get_dashboard(
         base_query = base_query.filter(models.Order.branch_name == branch_name)
 
     if start_date:
-        base_query = base_query.filter(models.Order.created_at >= start_date)
+        try:
+            sd = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+            base_query = base_query.filter(models.Order.created_at >= sd)
+        except ValueError:
+            pass
 
     if end_date:
-        base_query = base_query.filter(models.Order.created_at <= end_date)
+        try:
+            ed = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+            base_query = base_query.filter(models.Order.created_at <= ed)
+        except ValueError:
+            pass
 
     result = base_query.first()
     order_count = result.order_count or 0
@@ -527,10 +544,18 @@ def get_dashboard(
         profit_query = profit_query.filter(models.Order.branch_name == branch_name)
 
     if start_date:
-        profit_query = profit_query.filter(models.Order.created_at >= start_date)
+        try:
+            sd = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+            profit_query = profit_query.filter(models.Order.created_at >= sd)
+        except ValueError:
+            pass
 
     if end_date:
-        profit_query = profit_query.filter(models.Order.created_at <= end_date)
+        try:
+            ed = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+            profit_query = profit_query.filter(models.Order.created_at <= ed)
+        except ValueError:
+            pass
 
     profit_result = profit_query.first()
     total_profit = float(profit_result.total_profit or 0)

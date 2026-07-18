@@ -29,7 +29,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-function SortableMenuItem({ item, onToggleAvailability, onEdit, branchColors, FALLBACK_IMAGE_URL }: any) {
+function SortableMenuItem({ item, onToggleAvailability, onEdit, onDelete, branchColors, FALLBACK_IMAGE_URL }: any) {
   const {
     attributes,
     listeners,
@@ -110,6 +110,9 @@ function SortableMenuItem({ item, onToggleAvailability, onEdit, branchColors, FA
           </button>
           <button onClick={() => onEdit(item)} className="p-1.5 bg-stone-200 hover:bg-stone-300 rounded-none text-stone-700 transition-all">
             <Edit className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={() => onDelete(item.id)} className="p-1.5 bg-red-100 hover:bg-red-200 rounded-none text-red-600 border border-red-300 transition-all">
+            <Trash className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
@@ -248,12 +251,14 @@ export default function AdminApp() {
   const [newCategoryName, setNewCategoryName] = useState("");
 
   // Dashboard date filter
-  const [analyticsStartDate, setAnalyticsStartDate] = useState(
-    new Date(new Date().getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  );
-  const [analyticsEndDate, setAnalyticsEndDate] = useState(
-    new Date().toISOString().split('T')[0]
-  );
+  const getLocalDateStr = (offsetDays = 0) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offsetDays);
+    return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
+  };
+
+  const [analyticsStartDate, setAnalyticsStartDate] = useState(getLocalDateStr());
+  const [analyticsEndDate, setAnalyticsEndDate] = useState(getLocalDateStr());
 
   // Backend aggregated dish performance
   const [dishPerformance, setDishPerformance] = useState<any[]>([]);
@@ -266,12 +271,8 @@ export default function AdminApp() {
   const [dishCategoryFilter, setDishCategoryFilter] = useState("all");
 
   // Transactions Tab
-  const [transactionsStartDate, setTransactionsStartDate] = useState(
-    new Date(new Date().getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  );
-  const [transactionsEndDate, setTransactionsEndDate] = useState(
-    new Date().toISOString().split('T')[0]
-  );
+  const [transactionsStartDate, setTransactionsStartDate] = useState(getLocalDateStr());
+  const [transactionsEndDate, setTransactionsEndDate] = useState(getLocalDateStr());
   const [transactions, setTransactions] = useState<Order[]>([]);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
   const [transactionsSearch, setTransactionsSearch] = useState("");
@@ -284,8 +285,8 @@ export default function AdminApp() {
       setIsLoading(true);
       setError(null);
 
-      const startDate = analyticsStartDate ? new Date(analyticsStartDate).toISOString() : undefined;
-      const endDate = analyticsEndDate ? new Date(new Date(analyticsEndDate).getTime() + 24 * 60 * 60 * 1000 - 1).toISOString() : undefined;
+      const startDate = analyticsStartDate ? new Date(analyticsStartDate + "T00:00:00+07:00").toISOString() : undefined;
+      const endDate = analyticsEndDate ? new Date(analyticsEndDate + "T23:59:59+07:00").toISOString() : undefined;
 
       const [fetchedAnalytics, fetchedPerformance, fetchedMenu, fetchedBranches, fetchedCats, fetchedIngredients] = await Promise.all([
         ApiService.getDashboardAnalytics(selectedBranchFilter || undefined, startDate, endDate),
@@ -325,8 +326,8 @@ export default function AdminApp() {
     try {
       setIsLoadingTransactions(true);
       setError(null);
-      const startIso = new Date(transactionsStartDate + "T00:00:00Z").toISOString();
-      const endIso = new Date(transactionsEndDate + "T23:59:59Z").toISOString();
+      const startIso = new Date(transactionsStartDate + "T00:00:00+07:00").toISOString();
+      const endIso = new Date(transactionsEndDate + "T23:59:59+07:00").toISOString();
       const data = await ApiService.getTransactions(selectedBranchFilter || undefined, startIso, endIso);
       setTransactions(data);
     } catch (err: any) {
@@ -585,6 +586,16 @@ export default function AdminApp() {
       resetMenuForm();
     } catch (err: any) {
       alert(`Menu modification failed: ${err.message}`);
+    }
+  };
+
+  const handleDeleteMenuItem = async (id: number) => {
+    if (!window.confirm(`Are you sure you want to permanently delete this menu item?`)) return;
+    try {
+      await ApiService.deleteMenuItem(id);
+      setMenuItems(prev => prev.filter(m => m.id !== id));
+    } catch (err: any) {
+      alert(`Failed to delete menu item: ${err.message}`);
     }
   };
 
@@ -1334,6 +1345,7 @@ export default function AdminApp() {
                           item={item} 
                           onToggleAvailability={handleToggleMenuAvailability} 
                           onEdit={(i: any) => { handleEditMenuItemSelect(i); setIsMenuModalOpen(true); }}
+                          onDelete={handleDeleteMenuItem}
                           branchColors={getBranchColorClasses(item.branch_name)}
                           FALLBACK_IMAGE_URL={FALLBACK_IMAGE_URL}
                         />

@@ -89,7 +89,7 @@ class MenuItemCreate(MenuItemBase):
 
 class MenuItemResponse(MenuItemBase):
     id: int
-    stock_count: int = 0
+    stock_count: Optional[int] = None
     ingredients: List[MenuItemIngredientResponse] = []
     model_config = {"from_attributes": True}
 

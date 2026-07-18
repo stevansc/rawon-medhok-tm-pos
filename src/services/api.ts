@@ -249,11 +249,17 @@ export class ApiService {
     });
   }
 
-  static async updateMenuItem(itemId: number, item: Omit<MenuItem, "id">): Promise<MenuItem> {
-    return this.request<MenuItem>(`/menu/${itemId}`, {
+  static async updateMenuItem(id: number, item: Omit<MenuItem, "id">): Promise<MenuItem> {
+    return this.request<MenuItem>(`/menu/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(item)
+    });
+  }
+
+  static async deleteMenuItem(id: number): Promise<void> {
+    return this.request<void>(`/menu/${id}`, {
+      method: "DELETE"
     });
   }
 

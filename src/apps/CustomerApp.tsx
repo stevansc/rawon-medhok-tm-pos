@@ -468,7 +468,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
                           (e.currentTarget as HTMLImageElement).src = "https://images.unsplash.com/photo-1601050690597-df056fb4ce78?w=200&auto=format&fit=crop";
                         }}
                       />
-                      {!item.is_available && (
+                      {(!item.is_available || item.stock_count === 0) && (
                         <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-[10px] text-white font-extrabold uppercase tracking-widest">
                           Sold Out
                         </div>
@@ -491,7 +491,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
                           Rp {item.price_normal.toLocaleString("id-ID")}
                         </span>
 
-                        {item.is_available && (
+                        {item.is_available && item.stock_count !== 0 && (
                           <button
                             onClick={() => addToCart(item)}
                             className="bg-orange-600 text-white py-1 px-3 hover:bg-orange-700 active:scale-95 transition-all flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-wider"
