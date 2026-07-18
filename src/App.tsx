@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, useParams, Link } from "react-router-dom";
 import CustomerApp from "./apps/CustomerApp";
-import KitchenApp from "./apps/KitchenApp";
+import EmployeeApp from "./apps/EmployeeApp";
 import CashierApp from "./apps/CashierApp";
 import AdminApp from "./apps/AdminApp";
 import { ChefHat, Banknote, ShieldAlert, Smartphone } from "lucide-react";
@@ -13,9 +13,9 @@ function CustomerWrapper() {
   return <CustomerApp branchNameQuery={branchName} tableNumberQuery={tableNumber} />;
 }
 
-function KitchenWrapper() {
+function EmployeeWrapper() {
   const { branchName } = useParams();
-  return <KitchenApp currentBranch={branchName || ""} />;
+  return <EmployeeApp currentBranch={branchName || ""} />;
 }
 
 function CashierWrapper() {
@@ -50,11 +50,11 @@ function AppDirectory() {
             <p className="text-[10px] text-stone-500 font-mono uppercase">Public menu & ordering</p>
           </Link>
           
-          <Link to={`/kitchen/${defaultBranch}`} className="bg-white p-6 rounded-none shadow-[4px_4px_0px_0px_rgba(0,0,0,0.9)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,0.9)] transition-all border-2 border-stone-900 flex flex-col items-center text-center group active:scale-95">
+          <Link to={`/employee/${defaultBranch}`} className="bg-white p-6 rounded-none shadow-[4px_4px_0px_0px_rgba(0,0,0,0.9)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,0.9)] transition-all border-2 border-stone-900 flex flex-col items-center text-center group active:scale-95">
             <div className="w-16 h-16 bg-red-100 text-red-600 rounded-none border border-red-200 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
               <ChefHat size={32} />
             </div>
-            <h2 className="text-xl font-black text-stone-900 mb-1 uppercase tracking-wide">Kitchen</h2>
+            <h2 className="text-xl font-black text-stone-900 mb-1 uppercase tracking-wide">Employee</h2>
             <p className="text-[10px] text-stone-500 font-mono uppercase">Order ticket management</p>
           </Link>
           
@@ -85,7 +85,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<AppDirectory />} />
         <Route path="/customer/:branchName?/:tableNumber?" element={<CustomerWrapper />} />
-        <Route path="/kitchen/:branchName?" element={<KitchenWrapper />} />
+        <Route path="/employee/:branchName?" element={<EmployeeWrapper />} />
         <Route path="/cashier/:branchName?" element={<CashierWrapper />} />
         <Route path="/admin" element={<AdminApp />} />
       </Routes>

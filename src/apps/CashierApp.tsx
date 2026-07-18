@@ -5,8 +5,9 @@ import { useAuth } from "../hooks/useAuth";
 import LoginScreen from "../components/LoginScreen";
 import {
   Banknote, Receipt, LogOut, Search, MapPin,
-  RefreshCw, ShoppingCart, Check
+  RefreshCw, ShoppingCart, Check, Printer
 } from "lucide-react";
+import { printReceipt, ReceiptData } from "../services/printer";
 
 interface CashierAppProps {
   currentBranch: string;
@@ -24,9 +25,15 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
 
   // Selected order for checkout detail
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<"Cash" | "QRIS" | "Debit">("QRIS");
+  const [paymentMethod, setPaymentMethod] = useState<"Cash" | "QRIS" | "Debit">("Cash");
   const [cashAmountPaid, setCashAmountPaid] = useState<string>("");
+  const [printedReceiptOrder, setPrintedReceiptOrder] = useState<Order | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  
+  // Discount state
+  const [isDiscountMode, setIsDiscountMode] = useState(false);
+  const [discountAmount, setDiscountAmount] = useState<string>("");
+  const [discountReason, setDiscountReason] = useState<string>("");
 
   // Fetch cashier orders
   const fetchOrders = async () => {
@@ -48,13 +55,48 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
     fetchOrders();
   }, [auth.user]);
 
+  // Printer modal timeout
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout>;
+    if (printedReceiptOrder) {
+      timeout = setTimeout(() => {
+        setPrintedReceiptOrder(null);
+      }, 3000);
+    }
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [printedReceiptOrder]);
+
   // Complete checkout & process payment
   const handleProcessPayment = async () => {
     if (!selectedOrder) return;
 
+    let finalDiscountAmount: number | undefined = undefined;
+    let finalDiscountReason: string | undefined = undefined;
+    
+    if (isDiscountMode) {
+      const parsedDiscount = parseFloat(discountAmount);
+      if (isNaN(parsedDiscount) || parsedDiscount < 0) {
+        alert("Invalid discount amount.");
+        return;
+      }
+      if (!discountReason.trim()) {
+        alert("Please provide a reason for the discount/write-off.");
+        return;
+      }
+      finalDiscountAmount = parsedDiscount;
+      finalDiscountReason = discountReason.trim();
+    }
+
+    let finalTotal = selectedOrder.total_amount;
+    if (finalDiscountAmount) {
+      finalTotal = Math.max(0, finalTotal - finalDiscountAmount);
+    }
+
     if (paymentMethod === "Cash") {
       const parsedCash = parseFloat(cashAmountPaid);
-      if (isNaN(parsedCash) || parsedCash < selectedOrder.total_amount) {
+      if (isNaN(parsedCash) || parsedCash < finalTotal) {
         alert("Insufficient cash payment amount.");
         return;
       }
@@ -62,9 +104,10 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
 
     try {
       setIsProcessingPayment(true);
-      const updated = await ApiService.updateOrderStatus(selectedOrder.id, "completed", paymentMethod);
+      const updated = await ApiService.updateOrderStatus(selectedOrder.id, "completed", paymentMethod, finalDiscountAmount, finalDiscountReason);
       setOrders(prev => prev.map(o => o.id === selectedOrder.id ? updated : o));
       setSelectedOrder(updated);
+      setPrintedReceiptOrder(updated);
       fetchOrders();
     } catch (err: any) {
       alert(`Payment failed: ${err.message}`);
@@ -81,8 +124,8 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
       o.id.toString().includes(searchQuery);
     if (!matchesSearch) return false;
 
-    if (statusFilter === "all_active") return o.status !== "completed";
-    if (statusFilter === "completed") return o.status === "completed";
+    if (statusFilter === "all_active") return !["completed", "discounted"].includes(o.status);
+    if (statusFilter === "completed") return ["completed", "discounted"].includes(o.status);
     if (statusFilter === "on_table") return o.status === "on_table";
     return true;
   });
@@ -91,7 +134,42 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
     if (!selectedOrder || paymentMethod !== "Cash") return 0;
     const paid = parseFloat(cashAmountPaid);
     if (isNaN(paid)) return 0;
-    return Math.max(0, paid - selectedOrder.total_amount);
+    
+    let finalTotal = selectedOrder.total_amount;
+    if (isDiscountMode) {
+      const discount = parseFloat(discountAmount) || 0;
+      finalTotal = Math.max(0, finalTotal - discount);
+    }
+    
+    return Math.max(0, paid - finalTotal);
+  };
+
+  const handleBluetoothPrint = async (order: Order) => {
+    try {
+      const receiptData: ReceiptData = {
+        branchName: order.branch_name,
+        invoiceNumber: order.daily_order_number || order.id,
+        tableNumber: order.table_number,
+        customerName: order.customer_name || "Guest",
+        cashierName: auth.user?.username || "CASHIER",
+        paymentMethod: order.payment_method || "N/A",
+        createdAt: order.created_at,
+        items: order.items.map(item => ({
+          name: item.menu_item?.name || "Unknown",
+          quantity: item.quantity,
+          price: (item.menu_item?.price_normal || 0) * item.quantity,
+        })),
+        subtotal: order.total_amount - order.tax_amount,
+        taxAmount: order.tax_amount,
+        discountAmount: order.discount_amount,
+        discountReason: order.discount_reason || undefined,
+        totalAmount: order.total_amount,
+      };
+      await printReceipt(receiptData);
+      alert("Receipt printed successfully!");
+    } catch (err: any) {
+      alert(`Print failed: ${err.message}`);
+    }
   };
 
   if (!auth.isAuthenticated) {
@@ -221,6 +299,8 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
                     <span className={`px-2 py-0.5 rounded-none text-[9px] font-bold uppercase tracking-wider font-mono ${
                       order.status === "completed"
                         ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                        : order.status === "discounted"
+                        ? "bg-red-200 text-red-900 border border-red-300 shadow-sm"
                         : order.status === "on_table"
                         ? "bg-orange-100 text-orange-950 border border-orange-200"
                         : "bg-stone-100 text-stone-800 border border-stone-200"
@@ -230,7 +310,7 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
                   </div>
 
                   <div className="mt-4 pt-3 border-t border-dashed border-stone-200 flex justify-between items-center">
-                    <span className="text-[9px] text-stone-400 font-mono">#{order.id} • {order.items.length} ITM</span>
+                    <span className="text-[9px] text-stone-400 font-mono">#{order.daily_order_number || order.id} • {order.items.length} ITM</span>
                     <span className="font-bold text-xs text-orange-600 font-mono">Rp {order.total_amount.toLocaleString("id-ID")}</span>
                   </div>
                 </div>
@@ -254,7 +334,7 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
 
               {/* Order Metadata */}
               <div className="py-4 space-y-1 text-xs border-b border-stone-800 font-mono text-[11px]">
-                <div className="flex justify-between text-stone-400"><span>INVOICE ID:</span><span className="font-bold text-white">#{selectedOrder.id}</span></div>
+                <div className="flex justify-between text-stone-400"><span>INVOICE ID:</span><span className="font-bold text-white">#{selectedOrder.daily_order_number || selectedOrder.id}</span></div>
                 <div className="flex justify-between text-stone-400"><span>TABLE NO:</span><span className="font-bold text-white uppercase">Table {selectedOrder.table_number}</span></div>
                 <div className="flex justify-between text-stone-400"><span>CUSTOMER:</span><span className="font-bold text-white uppercase">{selectedOrder.customer_name}</span></div>
                 <div className="flex justify-between text-stone-400"><span>CREATED:</span><span className="text-white">{new Date(selectedOrder.created_at.endsWith('Z') ? selectedOrder.created_at : selectedOrder.created_at + 'Z').toLocaleTimeString()}</span></div>
@@ -266,7 +346,7 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
                   <div key={i} className="text-xs">
                     <div className="flex justify-between text-white font-medium">
                       <span>{item.quantity}x {item.menu_item?.name}</span>
-                      <span className="font-mono">Rp {(item.menu_item?.price * item.quantity).toLocaleString("id-ID")}</span>
+                      <span className="font-mono">Rp {(item.menu_item?.price_normal * item.quantity).toLocaleString("id-ID")}</span>
                     </div>
                     {item.special_notes && (
                       <p className="text-[10px] text-orange-400 bg-stone-950 px-1.5 py-0.5 rounded-none mt-0.5 font-mono">* {item.special_notes}</p>
@@ -283,7 +363,7 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
               </div>
 
               {/* PAYMENT PROCESSOR */}
-              {selectedOrder.status !== "completed" ? (
+              {!["completed", "discounted"].includes(selectedOrder.status) ? (
                 <div className="mt-5 space-y-4">
                   <h4 className="font-black text-[10px] text-stone-400 uppercase tracking-widest">Select Payment Method</h4>
                   <div className="grid grid-cols-3 gap-2">
@@ -326,51 +406,119 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
                     </div>
                   )}
 
+                  {/* Discount / Write-Off Section */}
+                  <div className="border-t border-stone-800 pt-4 mt-2">
+                    <button
+                      onClick={() => setIsDiscountMode(!isDiscountMode)}
+                      className={`w-full py-2.5 rounded-none border text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+                        isDiscountMode 
+                          ? "bg-red-500/10 border-red-500 text-red-400" 
+                          : "bg-stone-950 border-stone-800 text-stone-500 hover:text-stone-300"
+                      }`}
+                    >
+                      <span>{isDiscountMode ? "Cancel Discount" : "Apply Discount / Write-Off"}</span>
+                    </button>
+                    
+                    {isDiscountMode && (
+                      <div className="mt-3 space-y-3 p-3 bg-red-500/5 border border-red-500/20 rounded-none">
+                        <div>
+                          <label className="block text-[10px] font-bold text-red-400 mb-1.5 uppercase font-mono">Discount Amount (Rp)</label>
+                          <input
+                            type="number"
+                            placeholder="e.g. 50000 or full amount"
+                            value={discountAmount}
+                            onChange={(e) => setDiscountAmount(e.target.value)}
+                            className="w-full bg-stone-900 border border-red-900/50 rounded-none p-2.5 text-red-200 focus:outline-none focus:border-red-500 text-center font-bold font-mono text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-red-400 mb-1.5 uppercase font-mono">Reason</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Short cash, Spoiled ingredient"
+                            value={discountReason}
+                            onChange={(e) => setDiscountReason(e.target.value)}
+                            className="w-full bg-stone-900 border border-red-900/50 rounded-none p-2.5 text-red-200 focus:outline-none focus:border-red-500 font-mono text-xs"
+                          />
+                        </div>
+                        {parseFloat(discountAmount) > 0 && (
+                          <div className="flex justify-between items-center text-xs font-mono font-bold text-red-400 pt-2 border-t border-red-900/50">
+                            <span>NEW GRAND TOTAL:</span>
+                            <span>Rp {Math.max(0, selectedOrder.total_amount - parseFloat(discountAmount)).toLocaleString("id-ID")}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   <button
                     onClick={handleProcessPayment}
                     disabled={isProcessingPayment}
-                    className="w-full py-4 bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs uppercase tracking-wider rounded-none shadow-md active:scale-95 transition-all flex items-center justify-center gap-2"
+                    className="w-full py-4 bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs uppercase tracking-wider rounded-none shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 mt-4"
                   >
                     <Check className="w-4 h-4 shrink-0" />
                     <span>{isProcessingPayment ? "Settling Invoice..." : "Approve Payment & Close order"}</span>
                   </button>
                 </div>
               ) : (
-                /* Invoice Printout */
-                <div className="mt-5 p-4 bg-white text-stone-950 rounded-none border-2 border-stone-900 font-mono text-[10px] space-y-2 relative shadow-md">
-                  <div className="text-center pb-2 border-b border-dashed border-stone-400">
-                    <p className="font-extrabold text-xs uppercase tracking-wider">RAWON TM - {selectedOrder.branch_name.toUpperCase()}</p>
-                    <p className="text-[9px]">SURABAYA, EAST JAVA</p>
-                  </div>
-                  <div className="space-y-0.5 text-left text-[9px]">
-                    <p>INVOICE : #{selectedOrder.id}</p>
-                    <p>TABLE   : TABLE {selectedOrder.table_number}</p>
-                    <p>CASHIER : {auth.user!.username.toUpperCase()}</p>
-                    <p>DATE    : {new Date(selectedOrder.created_at.endsWith('Z') ? selectedOrder.created_at : selectedOrder.created_at + 'Z').toLocaleDateString()}</p>
-                  </div>
-                  <div className="border-t border-dashed border-stone-400 py-1 space-y-1">
-                    {selectedOrder.items.map((it, i) => (
-                      <div key={i} className="flex justify-between">
-                        <span>{it.quantity}x {it.menu_item?.name.substring(0, 18)}</span>
-                        <span>{(it.menu_item?.price * it.quantity).toLocaleString("id-ID")}</span>
+                <>
+                  {/* Invoice Printout */}
+                  <div className="mt-5 p-4 bg-white text-stone-950 rounded-none border-2 border-stone-900 font-mono text-[10px] space-y-2 relative shadow-md">
+                    <div className="text-center pb-2 border-b border-dashed border-stone-400">
+                      <p className="font-extrabold text-xs uppercase tracking-wider">RAWON TM - {selectedOrder.branch_name.toUpperCase()}</p>
+                      <p className="text-[9px]">SURABAYA, EAST JAVA</p>
+                    </div>
+                    <div className="space-y-0.5 text-left text-[9px]">
+                      <p>INVOICE : #{selectedOrder.id}</p>
+                      <p>TABLE   : TABLE {selectedOrder.table_number}</p>
+                      <p>CASHIER : {auth.user!.username.toUpperCase()}</p>
+                      <p>DATE    : {new Date(selectedOrder.created_at.endsWith('Z') ? selectedOrder.created_at : selectedOrder.created_at + 'Z').toLocaleDateString()}</p>
+                    </div>
+                    <div className="border-t border-dashed border-stone-400 py-1 space-y-1">
+                      {selectedOrder.items.map((it, i) => (
+                        <div key={i} className="flex justify-between">
+                          <span>{it.quantity}x {it.menu_item?.name.substring(0, 18)}</span>
+                          <span>{(it.menu_item?.price_normal * it.quantity).toLocaleString("id-ID")}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="border-t border-dashed border-stone-400 pt-1 space-y-0.5">
+                      <div className="flex justify-between font-bold">
+                        <span>TAX INCL. ({Math.round(selectedOrder.tax_amount / (selectedOrder.total_amount - selectedOrder.tax_amount) * 100)}%)</span>
+                        <span>{selectedOrder.tax_amount.toLocaleString("id-ID")}</span>
                       </div>
-                    ))}
-                  </div>
-                  <div className="border-t border-dashed border-stone-400 pt-1 space-y-0.5">
-                    <div className="flex justify-between font-bold">
-                      <span>TAX INCL. ({Math.round(selectedOrder.tax_amount / (selectedOrder.total_amount - selectedOrder.tax_amount) * 100)}%)</span>
-                      <span>{selectedOrder.tax_amount.toLocaleString("id-ID")}</span>
+                      {(selectedOrder.discount_amount && selectedOrder.discount_amount > 0) ? (
+                        <>
+                          <div className="flex justify-between font-bold text-red-600">
+                            <span>DISCOUNT:</span>
+                            <span>- Rp {selectedOrder.discount_amount.toLocaleString("id-ID")}</span>
+                          </div>
+                          <div className="flex justify-between font-black text-[11px] pt-1">
+                            <span>TOTAL PAID ({selectedOrder.payment_method})</span>
+                            <span>Rp {Math.max(0, selectedOrder.total_amount - selectedOrder.discount_amount).toLocaleString("id-ID")}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex justify-between font-black text-[11px]">
+                          <span>TOTAL PAID ({selectedOrder.payment_method})</span>
+                          <span>Rp {selectedOrder.total_amount.toLocaleString("id-ID")}</span>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex justify-between font-black text-[11px]">
-                      <span>TOTAL PAID ({selectedOrder.payment_method})</span>
-                      <span>Rp {selectedOrder.total_amount.toLocaleString("id-ID")}</span>
+                    <div className="text-center pt-2 border-t border-dashed border-stone-400">
+                      <p className="font-bold">SUWUN! MATUR NUWUN</p>
+                      <p className="text-[9px]">Thank you for dining with us!</p>
                     </div>
                   </div>
-                  <div className="text-center pt-2 border-t border-dashed border-stone-400">
-                    <p className="font-bold">SUWUN! MATUR NUWUN</p>
-                    <p className="text-[9px]">Thank you for dining with us!</p>
-                  </div>
-                </div>
+                  
+                  <button
+                    onClick={() => handleBluetoothPrint(selectedOrder)}
+                    className="w-full py-3.5 mt-4 bg-stone-800 hover:bg-stone-700 text-stone-300 font-bold text-xs uppercase tracking-wider rounded-none shadow-md active:scale-95 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Printer className="w-4 h-4" />
+                    <span>Reprint Receipt via Bluetooth</span>
+                  </button>
+                </>
               )}
             </div>
 
@@ -386,6 +534,51 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
           </div>
         )}
       </div>
+
+      {/* Bluetooth Printer Receipt Modal */}
+      {printedReceiptOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/80 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-white text-stone-900 w-full max-w-sm border-4 border-double border-stone-900 p-6 shadow-2xl relative flex flex-col font-mono animate-scale-in">
+            <div className="text-center pb-4 border-b border-dashed border-stone-300">
+              <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-[10px] font-bold uppercase tracking-wider mb-2 font-sans rounded-full">📶 Bluetooth Connected</span>
+              <h3 className="font-extrabold text-sm uppercase tracking-widest text-stone-800 animate-pulse">*** CASHIER RECEIPT ***</h3>
+            </div>
+            <div className="py-4 space-y-3 text-xs leading-relaxed">
+              <div className="flex justify-between font-bold">
+                <span>INVOICE: #{printedReceiptOrder.daily_order_number || printedReceiptOrder.id}</span>
+                <span>TABLE: {printedReceiptOrder.table_number}</span>
+              </div>
+              <div className="border-b border-dashed border-stone-200 pb-2">
+                <p><span className="font-bold">CUST:</span> {printedReceiptOrder.customer_name ? printedReceiptOrder.customer_name.toUpperCase() : "GUEST"}</p>
+                <p><span className="font-bold">CASHIER:</span> {auth.user?.username.toUpperCase()}</p>
+                <p><span className="font-bold">PAYMENT:</span> {printedReceiptOrder.payment_method?.toUpperCase() || "N/A"}</p>
+              </div>
+              <div className="space-y-1.5 py-1 border-b border-dashed border-stone-200">
+                {printedReceiptOrder.items.map((it, idx) => (
+                  <div key={idx} className="flex justify-between">
+                    <span>{it.quantity}x {it.menu_item?.name.toUpperCase() || "UNKNOWN ITEM"}</span>
+                    <span>{(it.menu_item?.price_normal * it.quantity).toLocaleString("id-ID")}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between text-[10px]">
+                  <span>TAX</span>
+                  <span>{printedReceiptOrder.tax_amount.toLocaleString("id-ID")}</span>
+                </div>
+                <div className="flex justify-between font-black">
+                  <span>TOTAL</span>
+                  <span>Rp {printedReceiptOrder.total_amount.toLocaleString("id-ID")}</span>
+                </div>
+              </div>
+            </div>
+            <div className="text-center pt-4 border-t border-dashed border-stone-300">
+              <p className="text-[10px] text-stone-500 uppercase tracking-wider font-bold">MATUR NUWUN!</p>
+              <p className="text-[9px] text-stone-400 mt-2">Closing automatically...</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

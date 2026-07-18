@@ -1,4 +1,4 @@
-export type UserRole = "admin" | "cashier" | "kitchen";
+export type UserRole = "admin" | "cashier" | "employee";
 
 export interface User {
   id: number;
@@ -13,11 +13,30 @@ export interface Branch {
   color_theme: string;  // e.g. 'teal', 'indigo', 'stone'
 }
 
+export interface Ingredient {
+  id?: number;
+  name: string;
+  stock_qty: number;
+  unit: string;
+  branch_name: string;
+  sort_order?: number;
+}
+
+export interface MenuItemIngredient {
+  id?: number;
+  ingredient_id: number;
+  required_qty: number;
+  ingredient?: Ingredient;
+}
+
 export interface MenuItem {
   id: number;
   name: string;
   description: string;
-  price: number;
+  price_normal: number;
+  price_gofood: number | null;
+  price_grabfood: number | null;
+  price_shopee: number | null;
   category: string;
   image_url: string;
   is_available: boolean;
@@ -25,6 +44,8 @@ export interface MenuItem {
   stock_count?: number;
   cost?: number;
   addons?: string[];
+  sort_order?: number;
+  ingredients?: MenuItemIngredient[];
 }
 
 export interface OrderItemInput {
@@ -48,7 +69,7 @@ export interface OrderInput {
   items: OrderItemInput[];
 }
 
-export type OrderStatus = "pending" | "accepted" | "cooking" | "on_table" | "completed";
+export type OrderStatus = "cooking" | "cooked" | "on_table" | "completed" | "discounted";
 
 export interface Order {
   id: number;
@@ -63,6 +84,12 @@ export interface Order {
   status: OrderStatus;
   payment_method: "Cash" | "QRIS" | "Debit" | null;
   created_at: string;
+  cooked_at?: string;
+  served_at?: string;
+  paid_at?: string;
+  daily_order_number?: number;
+  discount_amount?: number;
+  discount_reason?: string | null;
 }
 
 export interface TokenResponse {

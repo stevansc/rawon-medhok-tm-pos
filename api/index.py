@@ -7,7 +7,7 @@ from fastapi import FastAPI, Depends, HTTPException, Query, status, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func
+from sqlalchemy import func, cast, Date
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
@@ -129,21 +129,53 @@ def get_menu(
     db: Session = Depends(get_db)
 ):
     response.headers["Cache-Control"] = "public, max-age=60, s-maxage=60, stale-while-revalidate=86400"
-    query = db.query(models.MenuItem)
+    query = db.query(models.MenuItem).options(
+        joinedload(models.MenuItem.ingredients).joinedload(models.MenuItemIngredient.ingredient)
+    )
     if branch_name:
         query = query.filter(models.MenuItem.branch_name == branch_name)
     if category:
         query = query.filter(models.MenuItem.category == category)
     if search:
         query = query.filter(models.MenuItem.name.ilike(f"%{search}%"))
-    return query.all()
+        
+    menu_items = query.order_by(models.MenuItem.sort_order.asc()).all()
+    for item in menu_items:
+        if not item.ingredients:
+            item.stock_count = 0
+        else:
+            item.stock_count = int(min(
+                (mapping.ingredient.stock_qty // mapping.required_qty)
+                for mapping in item.ingredients if mapping.required_qty > 0
+            ))
+            
+    return menu_items
 
 @app.post("/api/menu/", response_model=schemas.MenuItemResponse)
 def create_menu_item(item: schemas.MenuItemCreate, db: Session = Depends(get_db), current_user: models.User = Depends(auth.require_role(["admin"]))):
-    db_item = models.MenuItem(**item.model_dump())
+    min_sort = db.query(func.min(models.MenuItem.sort_order)).filter(models.MenuItem.branch_name == item.branch_name).scalar()
+    new_sort_order = (min_sort if min_sort is not None else 0) - 1
+
+    item_data = item.model_dump(exclude={'ingredients'})
+    db_item = models.MenuItem(**item_data)
+    db_item.sort_order = new_sort_order
     db.add(db_item)
+    db.flush()
+    
+    for ing_data in item.ingredients:
+        db.add(models.MenuItemIngredient(
+            menu_item_id=db_item.id,
+            ingredient_id=ing_data.ingredient_id,
+            required_qty=ing_data.required_qty
+        ))
+
     db.commit()
     db.refresh(db_item)
+    
+    db_item.stock_count = 0 if not db_item.ingredients else int(min(
+        (mapping.ingredient.stock_qty // mapping.required_qty)
+        for mapping in db_item.ingredients if mapping.required_qty > 0
+    ))
     return db_item
 
 @app.put("/api/menu/{item_id}", response_model=schemas.MenuItemResponse)
@@ -152,11 +184,36 @@ def update_menu_item(item_id: int, item: schemas.MenuItemCreate, db: Session = D
     if not db_item:
         raise HTTPException(status_code=404, detail="Menu item not found")
 
-    for key, value in item.model_dump().items():
+    item_data = item.model_dump(exclude={'ingredients'})
+    for key, value in item_data.items():
+        if key == 'sort_order':
+            continue # Preserve sort_order on update
         setattr(db_item, key, value)
 
+    # Update ingredients
+    db.query(models.MenuItemIngredient).filter(models.MenuItemIngredient.menu_item_id == item_id).delete()
+    for ing_data in item.ingredients:
+        db.add(models.MenuItemIngredient(
+            menu_item_id=item_id,
+            ingredient_id=ing_data.ingredient_id,
+            required_qty=ing_data.required_qty
+        ))
+
     db.commit()
+    db.refresh(db_item)
+    
+    db_item.stock_count = 0 if not db_item.ingredients else int(min(
+        (mapping.ingredient.stock_qty // mapping.required_qty)
+        for mapping in db_item.ingredients if mapping.required_qty > 0
+    ))
     return db_item
+
+@app.put("/api/admin/menu/reorder")
+def reorder_menu_items(request: schemas.MenuItemReorderRequest, db: Session = Depends(get_db), current_user: models.User = Depends(auth.require_role(["admin"]))):
+    for item in request.items:
+        db.query(models.MenuItem).filter(models.MenuItem.id == item.id).update({"sort_order": item.sort_order})
+    db.commit()
+    return {"message": "Reordered successfully"}
 
 @app.delete("/api/menu/{item_id}")
 def delete_menu_item(item_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(auth.require_role(["admin"]))):
@@ -185,7 +242,9 @@ def create_order(order: schemas.OrderCreate, db: Session = Depends(get_db)):
     # Batch-fetch all menu items in a single query (avoids N+1)
     total_price = 0
     item_ids = [item.menu_item_id for item in order.items]
-    menu_items = db.query(models.MenuItem).filter(models.MenuItem.id.in_(item_ids)).all()
+    menu_items = db.query(models.MenuItem).options(
+        joinedload(models.MenuItem.ingredients).joinedload(models.MenuItemIngredient.ingredient)
+    ).filter(models.MenuItem.id.in_(item_ids)).all()
     menu_items_map = {mi.id: mi for mi in menu_items}
 
     for item in order.items:
@@ -194,11 +253,24 @@ def create_order(order: schemas.OrderCreate, db: Session = Depends(get_db)):
             raise HTTPException(status_code=404, detail=f"Menu item {item.menu_item_id} not found")
         if menu_item.branch_name != order.branch_name:
             raise HTTPException(status_code=400, detail=f"Item {item.menu_item_id} is not available in {order.branch_name}")
-        if menu_item.stock_count < item.quantity:
-            raise HTTPException(status_code=400, detail=f"Not enough stock for item {menu_item.name}")
 
-        total_price += float(menu_item.price) * item.quantity
-        menu_item.stock_count -= item.quantity
+        for mapping in menu_item.ingredients:
+            req_qty = mapping.required_qty * item.quantity
+            if mapping.ingredient.stock_qty < req_qty:
+                raise HTTPException(status_code=400, detail=f"Not enough stock for item {menu_item.name} (Short on {mapping.ingredient.name})")
+            mapping.ingredient.stock_qty -= req_qty
+
+        o_type = order.order_type.lower()
+        if o_type == 'gofood':
+            item_price = menu_item.price_gofood if menu_item.price_gofood is not None else menu_item.price_normal
+        elif o_type == 'grabfood':
+            item_price = menu_item.price_grabfood if menu_item.price_grabfood is not None else menu_item.price_normal
+        elif o_type == 'shopeefood':
+            item_price = menu_item.price_shopee if menu_item.price_shopee is not None else menu_item.price_normal
+        else:
+            item_price = menu_item.price_normal
+
+        total_price += float(item_price) * item.quantity
 
         order_item = models.OrderItem(
             menu_item_id=item.menu_item_id,
@@ -210,6 +282,14 @@ def create_order(order: schemas.OrderCreate, db: Session = Depends(get_db)):
     tax_amount = float(total_price) * float(branch.tax_rate)
     db_order.tax_amount = tax_amount
     db_order.total_amount = float(total_price) + tax_amount
+
+    today = datetime.utcnow().date()
+    max_daily = db.query(func.max(models.Order.daily_order_number)).filter(
+        models.Order.branch_name == order.branch_name,
+        cast(models.Order.created_at, Date) == today
+    ).scalar()
+    
+    db_order.daily_order_number = (max_daily + 1) if max_daily else 31
 
     db.add(db_order)
     db.commit()
@@ -226,7 +306,7 @@ def get_orders(
     branch_name: Optional[str] = None,
     status: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.require_role(["admin", "cashier", "kitchen"]))
+    current_user: models.User = Depends(auth.require_role(["admin", "cashier", "employee"]))
 ):
     query = db.query(models.Order).options(
         joinedload(models.Order.items).joinedload(models.OrderItem.menu_item)
@@ -239,10 +319,10 @@ def get_orders(
     return query.all()
 
 @app.post("/api/orders/{order_id}/items/{item_id}/decline")
-def decline_order_item(order_id: int, item_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(auth.require_role(["admin", "kitchen"]))):
-    # Single query with eager-loaded menu_item (avoids extra query)
+def decline_order_item(order_id: int, item_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(auth.require_role(["admin", "employee"]))):
+    # Single query with eager-loaded menu_item and ingredients
     order_item = db.query(models.OrderItem).options(
-        joinedload(models.OrderItem.menu_item)
+        joinedload(models.OrderItem.menu_item).joinedload(models.MenuItem.ingredients).joinedload(models.MenuItemIngredient.ingredient)
     ).filter(
         models.OrderItem.order_id == order_id,
         models.OrderItem.id == item_id
@@ -258,18 +338,19 @@ def decline_order_item(order_id: int, item_id: int, db: Session = Depends(get_db
 
     # Restore stock via already-loaded relationship
     if order_item.menu_item:
-        order_item.menu_item.stock_count += order_item.quantity
+        for mapping in order_item.menu_item.ingredients:
+            mapping.ingredient.stock_qty += mapping.required_qty * order_item.quantity
         order_item.menu_item.is_available = True
 
     db.commit()
-    return {"status": "success", "restored_stock": order_item.menu_item.stock_count if order_item.menu_item else 0}
+    return {"status": "success", "restored_stock": 0}
 
 @app.patch("/api/orders/{order_id}/status", response_model=schemas.OrderResponse)
 def update_order_status(
     order_id: int,
     status_update: schemas.OrderStatusUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.require_role(["admin", "cashier", "kitchen"]))
+    current_user: models.User = Depends(auth.require_role(["admin", "cashier", "employee"]))
 ):
     # Eager-load items + menu_items to avoid N+1 on serialization
     db_order = db.query(models.Order).options(
@@ -280,6 +361,23 @@ def update_order_status(
         raise HTTPException(status_code=404, detail="Order not found")
 
     db_order.status = status_update.status
+    if status_update.discount_amount is not None and status_update.discount_amount > 0:
+        db_order.discount_amount = status_update.discount_amount
+        db_order.discount_reason = status_update.discount_reason
+        # Force status to discounted if a discount is applied
+        if status_update.status == "completed":
+            db_order.status = "discounted"
+        
+    if status_update.status == "cooked":
+        db_order.cooked_at = datetime.utcnow()
+    elif status_update.status == "on_table":
+        db_order.served_at = datetime.utcnow()
+    elif status_update.status == "completed" or db_order.status == "discounted":
+        now = datetime.utcnow()
+        db_order.paid_at = now
+        if not db_order.served_at:
+            db_order.served_at = now
+
     if status_update.payment_method:
         db_order.payment_method = status_update.payment_method
 
@@ -288,6 +386,38 @@ def update_order_status(
     return db_order
 
 # --- ADMIN DASHBOARD ---
+@app.get("/api/admin/transactions", response_model=List[schemas.OrderResponse])
+def get_transactions(
+    branch_name: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_role(["admin"]))
+):
+    query = db.query(models.Order).options(
+        joinedload(models.Order.items).joinedload(models.OrderItem.menu_item)
+    )
+
+    if branch_name:
+        query = query.filter(models.Order.branch_name == branch_name)
+
+    if start_date:
+        try:
+            sd = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+            query = query.filter(models.Order.created_at >= sd)
+        except ValueError:
+            pass
+
+    if end_date:
+        try:
+            ed = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+            query = query.filter(models.Order.created_at <= ed)
+        except ValueError:
+            pass
+
+    # Return orders ordered by most recent first
+    return query.order_by(models.Order.created_at.desc()).all()
+
 @app.get("/api/admin/dish-performance", response_model=List[schemas.DishPerformanceResponse])
 def get_dish_performance(
     branch_name: Optional[str] = None,
@@ -304,16 +434,16 @@ def get_dish_performance(
             m.name,
             m.category,
             m.branch_name,
-            COALESCE(m.price, 0) as price,
+            COALESCE(m.price_normal, 0) as price,
             COALESCE(m.cost, 0) as cost,
-            m.stock_count as stock,
+            0 as stock,
             COALESCE(SUM(oi.quantity), 0) as sold_count,
-            COALESCE(SUM(oi.quantity * m.price), 0) as revenue,
-            COALESCE(SUM(oi.quantity * COALESCE(m.cost, m.price * 0.5)), 0) as cost_of_sales,
-            (COALESCE(SUM(oi.quantity * m.price), 0) - COALESCE(SUM(oi.quantity * COALESCE(m.cost, m.price * 0.5)), 0)) as profit
+            COALESCE(SUM(oi.quantity * m.price_normal), 0) as revenue,
+            COALESCE(SUM(oi.quantity * COALESCE(m.cost, m.price_normal * 0.5)), 0) as cost_of_sales,
+            (COALESCE(SUM(oi.quantity * m.price_normal), 0) - COALESCE(SUM(oi.quantity * COALESCE(m.cost, m.price_normal * 0.5)), 0)) as profit
         FROM menu_items m
         LEFT JOIN order_items oi ON oi.menu_item_id = m.id
-        LEFT JOIN orders o ON o.id = oi.order_id AND o.status = 'completed'
+        LEFT JOIN orders o ON o.id = oi.order_id AND o.status IN ('completed', 'discounted')
     """
 
     conditions = []
@@ -334,7 +464,7 @@ def get_dish_performance(
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
 
-    query += " GROUP BY m.id, m.name, m.category, m.branch_name, m.price, m.cost, m.stock_count"
+    query += " GROUP BY m.id, m.name, m.category, m.branch_name, m.price_normal, m.cost"
 
     results = db.execute(text(query), params).fetchall()
 
@@ -370,7 +500,7 @@ def get_dashboard(
     base_query = db.query(
         func.count(func.distinct(models.Order.id)).label('order_count'),
         func.sum(models.Order.total_amount).label('total_revenue')
-    ).filter(models.Order.status == "completed")
+    ).filter(models.Order.status.in_(["completed", "discounted"]))
 
     if branch_name:
         base_query = base_query.filter(models.Order.branch_name == branch_name)
@@ -387,11 +517,11 @@ def get_dashboard(
 
     # Profit via JOIN (avoids downloading all rows)
     profit_query = db.query(
-        func.sum((models.MenuItem.price - models.MenuItem.cost) * models.OrderItem.quantity).label('total_profit')
+        func.sum((models.MenuItem.price_normal - models.MenuItem.cost) * models.OrderItem.quantity).label('total_profit')
     ).select_from(models.Order)\
      .join(models.OrderItem, models.Order.id == models.OrderItem.order_id)\
      .join(models.MenuItem, models.OrderItem.menu_item_id == models.MenuItem.id)\
-     .filter(models.Order.status == "completed")
+     .filter(models.Order.status.in_(["completed", "discounted"]))
 
     if branch_name:
         profit_query = profit_query.filter(models.Order.branch_name == branch_name)
@@ -438,5 +568,79 @@ def delete_promotion(promo_id: int, db: Session = Depends(get_db), current_user:
     if not db_promo:
         raise HTTPException(status_code=404, detail="Promotion not found")
     db.delete(db_promo)
+    db.commit()
+    return {"message": "Deleted"}
+
+@app.delete("/api/admin/transactions/{order_id}")
+def delete_transaction(order_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(auth.require_role(["admin"]))):
+    db_order = db.query(models.Order).options(
+        joinedload(models.Order.items).joinedload(models.OrderItem.menu_item).joinedload(models.MenuItem.ingredients).joinedload(models.MenuItemIngredient.ingredient)
+    ).filter(models.Order.id == order_id).first()
+    
+    if not db_order:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+        
+    # Restore stock for all non-declined items
+    for order_item in db_order.items:
+        if order_item.status != "declined" and order_item.menu_item:
+            for mapping in order_item.menu_item.ingredients:
+                mapping.ingredient.stock_qty += mapping.required_qty * order_item.quantity
+
+    db.query(models.OrderItem).filter(models.OrderItem.order_id == order_id).delete()
+    db.delete(db_order)
+    db.commit()
+    return {"message": "Transaction deleted"}
+
+# --- INGREDIENTS ---
+@app.get("/api/ingredients", response_model=List[schemas.IngredientResponse])
+def get_ingredients(branch_name: Optional[str] = None, db: Session = Depends(get_db), current_user: models.User = Depends(auth.require_role(["admin"]))):
+    query = db.query(models.Ingredient)
+    if branch_name:
+        query = query.filter(models.Ingredient.branch_name == branch_name)
+    return query.order_by(models.Ingredient.sort_order.asc()).all()
+
+@app.post("/api/ingredients", response_model=schemas.IngredientResponse)
+def create_ingredient(ingredient: schemas.IngredientCreate, db: Session = Depends(get_db), current_user: models.User = Depends(auth.require_role(["admin"]))):
+    min_sort = db.query(func.min(models.Ingredient.sort_order)).filter(models.Ingredient.branch_name == ingredient.branch_name).scalar()
+    new_sort_order = (min_sort if min_sort is not None else 0) - 1
+    
+    ing_data = ingredient.model_dump()
+    ing_data["sort_order"] = new_sort_order
+    db_ing = models.Ingredient(**ing_data)
+    db.add(db_ing)
+    db.commit()
+    db.refresh(db_ing)
+    return db_ing
+
+@app.put("/api/ingredients/reorder")
+def reorder_ingredients(items: List[schemas.IngredientReorderItem], db: Session = Depends(get_db), current_user: models.User = Depends(auth.require_role(["admin"]))):
+    for item in items:
+        db.query(models.Ingredient).filter(models.Ingredient.id == item.id).update({"sort_order": item.sort_order})
+    db.commit()
+    return {"message": "Reordered successfully"}
+
+@app.put("/api/ingredients/{ing_id}", response_model=schemas.IngredientResponse)
+def update_ingredient(ing_id: int, update_data: schemas.IngredientUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(auth.require_role(["admin"]))):
+    db_ing = db.query(models.Ingredient).filter(models.Ingredient.id == ing_id).first()
+    if not db_ing:
+        raise HTTPException(status_code=404, detail="Ingredient not found")
+    if update_data.stock_qty is not None:
+        db_ing.stock_qty = update_data.stock_qty
+    if update_data.name is not None:
+        db_ing.name = update_data.name
+    if update_data.unit is not None:
+        db_ing.unit = update_data.unit
+    if update_data.branch_name is not None:
+        db_ing.branch_name = update_data.branch_name
+    db.commit()
+    db.refresh(db_ing)
+    return db_ing
+
+@app.delete("/api/ingredients/{ing_id}")
+def delete_ingredient(ing_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(auth.require_role(["admin"]))):
+    db_ing = db.query(models.Ingredient).filter(models.Ingredient.id == ing_id).first()
+    if not db_ing:
+        raise HTTPException(status_code=404, detail="Ingredient not found")
+    db.delete(db_ing)
     db.commit()
     return {"message": "Deleted"}

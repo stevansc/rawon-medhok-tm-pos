@@ -8,14 +8,191 @@ import {
   Building, Settings, Plus, Edit,
   TrendingUp, CircleDollarSign, ShoppingBag, LogOut,
   AlertCircle, Sparkles, ChefHat, ToggleLeft, ToggleRight, Percent,
-  Search, ArrowUpDown, Flame
+  Search, ArrowUpDown, Flame, History, Clock, Calculator, Receipt, Trash, GripVertical, X, Equal, Minus
 } from "lucide-react";
+import { Order } from "../types";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+function SortableMenuItem({ item, onToggleAvailability, onEdit, branchColors, FALLBACK_IMAGE_URL }: any) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : 1,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const itemStock = item.stock_count ?? 0;
+  const itemCost = item.cost ?? Math.round(item.price_normal * 0.5);
+  const grossProfit = item.price_normal - itemCost;
+  const grossMarginPercent = item.price_normal > 0 ? Math.round((grossProfit / item.price_normal) * 100) : 0;
+
+  return (
+    <div ref={setNodeRef} style={style} className={`p-3 bg-stone-50 rounded-none border ${isDragging ? 'border-orange-500 shadow-2xl scale-[1.02]' : 'border-stone-200 hover:border-stone-400'} transition-all flex flex-col sm:flex-row justify-between gap-3 group relative`}>
+      <div className="flex gap-3 items-center w-full sm:w-auto">
+        <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-stone-400 hover:text-stone-900 px-2 py-4">
+          <GripVertical className="w-5 h-5" />
+        </div>
+        <img src={item.image_url || FALLBACK_IMAGE_URL} alt={item.name} referrerPolicy="no-referrer" className="w-16 h-16 object-cover rounded-none bg-stone-200 shrink-0 border border-stone-300 pointer-events-none" />
+        <div className="flex-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="font-bold text-xs text-stone-900 group-hover:text-orange-600 transition-colors uppercase">{item.name}</p>
+            <span className={`text-[8px] font-black uppercase px-1 py-0.5 border leading-none ${branchColors.bg} ${branchColors.text} ${branchColors.border}`}>
+              {item.branch_name}
+            </span>
+          </div>
+          <p className="text-[10px] text-stone-500 mt-1 line-clamp-1">{item.description || "No description."}</p>
+          <div className="flex flex-wrap gap-1.5 mt-2 font-mono">
+            <span className="text-[9px] bg-stone-200 text-stone-700 px-1.5 py-0.5 rounded-none font-bold uppercase">{item.category}</span>
+            {itemStock === 0 ? (
+              <span className="text-[9px] bg-red-100 text-red-700 border border-red-200 px-1.5 py-0.5 rounded-none font-bold uppercase">Out of Stock</span>
+            ) : (
+              <span className={`text-[9px] border px-1.5 py-0.5 rounded-none font-bold uppercase ${itemStock < 5 ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-stone-100 text-stone-700 border-stone-300"}`}>Stock: {itemStock}</span>
+            )}
+            <span className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded-none font-mono">
+              Cost: Rp {itemCost.toLocaleString("id-ID")}
+            </span>
+          </div>
+        </div>
+      </div>
+      <div className="flex sm:flex-col items-end justify-between text-right shrink-0">
+        <div className="flex flex-col items-end gap-1 font-mono">
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] text-stone-500 uppercase font-bold tracking-widest">Dine-in</span>
+            <span className="font-bold text-xs text-orange-600">Rp {item.price_normal.toLocaleString("id-ID")}</span>
+          </div>
+          {!!item.price_gofood && (
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] text-red-500/80 uppercase font-bold tracking-widest">GoFood</span>
+              <span className="font-bold text-[11px] text-stone-600">Rp {item.price_gofood.toLocaleString("id-ID")}</span>
+            </div>
+          )}
+          {!!item.price_grabfood && (
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] text-emerald-500/80 uppercase font-bold tracking-widest">Grab</span>
+              <span className="font-bold text-[11px] text-stone-600">Rp {item.price_grabfood.toLocaleString("id-ID")}</span>
+            </div>
+          )}
+          {!!item.price_shopee && (
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] text-orange-400/80 uppercase font-bold tracking-widest">Shopee</span>
+              <span className="font-bold text-[11px] text-stone-600">Rp {item.price_shopee.toLocaleString("id-ID")}</span>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2 mt-3 relative z-20">
+          <button onClick={() => onToggleAvailability(item)} disabled={itemStock === 0} className={`text-[10px] font-bold uppercase px-2 py-1 rounded-none bg-white border font-mono ${itemStock === 0 ? "text-stone-400 border-stone-200 bg-stone-100 cursor-not-allowed" : "hover:bg-stone-100 border-stone-300 text-stone-700"}`}>
+            {itemStock === 0 ? <span className="text-stone-400">Unavailable</span> : item.is_available ? <span className="text-emerald-600">Available</span> : <span className="text-red-500">Suspended</span>}
+          </button>
+          <button onClick={() => onEdit(item)} className="p-1.5 bg-stone-200 hover:bg-stone-300 rounded-none text-stone-700 transition-all">
+            <Edit className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SortableIngredientItem({ item, onEdit, onDelete, onUpdateStock, branchColors }: { item: any, onEdit: (i: any) => void, onDelete: (id: number) => void, onUpdateStock: (i: any) => void, branchColors: string }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : 1,
+    opacity: isDragging ? 0.8 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className={`flex flex-col sm:flex-row gap-4 p-3 border-2 transition-all group relative bg-white ${isDragging ? "border-orange-500 shadow-xl" : "border-stone-900 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.9)] hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,0.9)]"}`}>
+      <div {...attributes} {...listeners} className="absolute left-0 top-0 bottom-0 w-8 flex items-center justify-center cursor-grab active:cursor-grabbing bg-stone-50 border-r-2 border-stone-900 text-stone-400 group-hover:text-stone-900 transition-colors">
+        <GripVertical className="w-4 h-4" />
+      </div>
+      
+      <div className="flex-1 flex flex-col justify-center ml-8 min-w-0">
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
+          <h5 className="font-black text-sm uppercase truncate tracking-wide text-stone-900">{item.name}</h5>
+          <span className={`text-[9px] px-1.5 py-0.5 rounded-none font-bold uppercase tracking-widest text-white ${branchColors}`}>{item.branch_name}</span>
+        </div>
+        <div className="flex gap-4 text-xs font-mono text-stone-500">
+          <p>Stock: <span className="font-bold text-orange-600">{item.stock_qty}</span> {item.unit}</p>
+        </div>
+      </div>
+      
+      <div className="flex sm:flex-col items-end justify-center gap-2 shrink-0 relative z-20">
+        <div className="flex items-center gap-2">
+          <button onClick={() => onUpdateStock(item)} className="p-1.5 bg-stone-200 hover:bg-stone-300 rounded-none text-stone-700 transition-all">
+            <ArrowUpDown className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={() => onEdit(item)} className="p-1.5 bg-stone-200 hover:bg-stone-300 rounded-none text-stone-700 transition-all">
+            <Edit className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={() => onDelete(item.id)} className="p-1.5 bg-red-100 hover:bg-red-200 rounded-none text-red-600 border border-red-300 transition-all">
+            <Trash className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function AdminApp() {
   const auth = useAuth({ allowedRoles: ["admin"] });
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const formatDuration = (start?: string, end?: string) => {
+    if (!start || !end) return "-";
+    const startDate = new Date(start + (!start.endsWith('Z') ? 'Z' : ''));
+    const endDate = new Date(end + (!end.endsWith('Z') ? 'Z' : ''));
+    const diffMs = endDate.getTime() - startDate.getTime();
+    if (diffMs < 0) return "-";
+    
+    const diffSeconds = Math.floor(diffMs / 1000);
+    const h = Math.floor(diffSeconds / 3600);
+    const m = Math.floor((diffSeconds % 3600) / 60);
+    const s = diffSeconds % 60;
+    
+    if (h > 0) {
+      return `${h} hours ${m} minute ${s} seconds`;
+    }
+    return `${m} minute ${s} seconds`;
+  };
+
+  const formatLocalTime = (isoString?: string) => {
+    if (!isoString) return "-";
+    const d = new Date(isoString + (!isoString.endsWith('Z') ? 'Z' : ''));
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
   // Active section tab
-  const [activeTab, setActiveTab] = useState<"dashboard" | "branches" | "menu">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "branches" | "menu" | "transactions" | "inventory">("dashboard");
 
   // Admin state
   const [analytics, setAnalytics] = useState<DashboardAnalytics | null>(null);
@@ -37,9 +214,13 @@ export default function AdminApp() {
   const [branchFormColor, setBranchFormColor] = useState("stone");
 
   // Menu editor form states
+  const [isMenuModalOpen, setIsMenuModalOpen] = useState(false);
   const [editingMenuItem, setEditingMenuItem] = useState<MenuItem | null>(null);
   const [menuFormName, setMenuFormName] = useState("");
   const [menuFormPrice, setMenuFormPrice] = useState("");
+  const [menuFormGoFood, setMenuFormGoFood] = useState("");
+  const [menuFormGrabFood, setMenuFormGrabFood] = useState("");
+  const [menuFormShopee, setMenuFormShopee] = useState("");
   const [menuFormDesc, setMenuFormDesc] = useState("");
   const [menuFormCategory, setMenuFormCategory] = useState<string>("food");
   const [menuFormBranch, setMenuFormBranch] = useState("");
@@ -48,13 +229,31 @@ export default function AdminApp() {
   const [menuFormStock, setMenuFormStock] = useState("15");
   const [menuFormCost, setMenuFormCost] = useState("10000");
   const [menuFormAddons, setMenuFormAddons] = useState("");
+  const [menuFormIngredients, setMenuFormIngredients] = useState<any[]>([]);
+
+  // Inventory state
+  const [ingredients, setIngredients] = useState<any[]>([]);
+  const [isIngredientModalOpen, setIsIngredientModalOpen] = useState(false);
+  const [editingIngredient, setEditingIngredient] = useState<any | null>(null);
+  const [ingredientSearchQuery, setIngredientSearchQuery] = useState("");
+  const [ingredientFormName, setIngredientFormName] = useState("");
+  const [ingredientFormUnit, setIngredientFormUnit] = useState("pcs");
+  const [ingredientFormStock, setIngredientFormStock] = useState("0");
+  const [ingredientFormBranch, setIngredientFormBranch] = useState("");
+  const [adjustStockIngredient, setAdjustStockIngredient] = useState<any | null>(null);
+  const [adjustStockAmount, setAdjustStockAmount] = useState<string>("");
 
   // Dynamic Categories states
   const [categories, setCategories] = useState<string[]>([]);
   const [newCategoryName, setNewCategoryName] = useState("");
 
-  // Dashboard timeframe filter — drives real API start_date/end_date
-  const [analyticsTimeframe, setAnalyticsTimeframe] = useState<"daily" | "weekly" | "monthly" | "yearly">("monthly");
+  // Dashboard date filter
+  const [analyticsStartDate, setAnalyticsStartDate] = useState(
+    new Date(new Date().getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  );
+  const [analyticsEndDate, setAnalyticsEndDate] = useState(
+    new Date().toISOString().split('T')[0]
+  );
 
   // Backend aggregated dish performance
   const [dishPerformance, setDishPerformance] = useState<any[]>([]);
@@ -66,24 +265,17 @@ export default function AdminApp() {
   const [dishSortOrder, setDishSortOrder] = useState<"asc" | "desc">("desc");
   const [dishCategoryFilter, setDishCategoryFilter] = useState("all");
 
-  // Compute date range from timeframe
-  const getDateRange = (): { startDate?: string; endDate?: string } => {
-    const now = new Date();
-    let start: Date | undefined;
-    if (analyticsTimeframe === "daily") {
-      start = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    } else if (analyticsTimeframe === "weekly") {
-      start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    } else if (analyticsTimeframe === "monthly") {
-      start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    } else {
-      start = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-    }
-    return {
-      startDate: start?.toISOString(),
-      endDate: now.toISOString()
-    };
-  };
+  // Transactions Tab
+  const [transactionsStartDate, setTransactionsStartDate] = useState(
+    new Date(new Date().getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  );
+  const [transactionsEndDate, setTransactionsEndDate] = useState(
+    new Date().toISOString().split('T')[0]
+  );
+  const [transactions, setTransactions] = useState<Order[]>([]);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
+  const [transactionsSearch, setTransactionsSearch] = useState("");
+  const [transactionReceiptOrder, setTransactionReceiptOrder] = useState<Order | null>(null);
 
   // Fetch admin content
   const loadAdminData = async () => {
@@ -92,19 +284,22 @@ export default function AdminApp() {
       setIsLoading(true);
       setError(null);
 
-      const { startDate, endDate } = getDateRange();
+      const startDate = analyticsStartDate ? new Date(analyticsStartDate).toISOString() : undefined;
+      const endDate = analyticsEndDate ? new Date(new Date(analyticsEndDate).getTime() + 24 * 60 * 60 * 1000 - 1).toISOString() : undefined;
 
-      const [fetchedAnalytics, fetchedPerformance, fetchedMenu, fetchedBranches, fetchedCats] = await Promise.all([
+      const [fetchedAnalytics, fetchedPerformance, fetchedMenu, fetchedBranches, fetchedCats, fetchedIngredients] = await Promise.all([
         ApiService.getDashboardAnalytics(selectedBranchFilter || undefined, startDate, endDate),
         ApiService.getDishPerformance(selectedBranchFilter || undefined, startDate, endDate),
         ApiService.getMenu(selectedBranchFilter || undefined),
         branches.length === 0 ? ApiService.getBranches() : Promise.resolve(branches),
-        categories.length === 0 ? ApiService.getCategories() : Promise.resolve(categories)
+        categories.length === 0 ? ApiService.getCategories() : Promise.resolve(categories),
+        ApiService.getIngredients(selectedBranchFilter || undefined)
       ]);
 
       setAnalytics(fetchedAnalytics);
       setDishPerformance(fetchedPerformance);
       setMenuItems(fetchedMenu);
+      setIngredients(fetchedIngredients);
       if (branches.length === 0) setBranches(fetchedBranches);
       if (categories.length === 0) setCategories(fetchedCats);
 
@@ -122,7 +317,40 @@ export default function AdminApp() {
     if (auth.user) {
       loadAdminData();
     }
-  }, [auth.user, selectedBranchFilter, analyticsTimeframe]);
+  }, [auth.user, selectedBranchFilter, analyticsStartDate, analyticsEndDate]);
+
+  // Load transactions
+  const loadTransactions = async () => {
+    if (!auth.user || activeTab !== "transactions") return;
+    try {
+      setIsLoadingTransactions(true);
+      setError(null);
+      const startIso = new Date(transactionsStartDate + "T00:00:00Z").toISOString();
+      const endIso = new Date(transactionsEndDate + "T23:59:59Z").toISOString();
+      const data = await ApiService.getTransactions(selectedBranchFilter || undefined, startIso, endIso);
+      setTransactions(data);
+    } catch (err: any) {
+      setError(err.message || "Failed to load transactions.");
+    } finally {
+      setIsLoadingTransactions(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTransactions();
+  }, [activeTab, selectedBranchFilter, transactionsStartDate, transactionsEndDate]);
+
+  // Delete transaction
+  const handleDeleteTransaction = async (orderId: number) => {
+    if (!window.confirm(`Are you sure you want to permanently delete transaction #${orderId}? This cannot be undone.`)) return;
+    try {
+      await ApiService.deleteTransaction(orderId);
+      setTransactions(prev => prev.filter(t => t.id !== orderId));
+      setTransactionReceiptOrder(null);
+    } catch (err: any) {
+      alert(`Failed to delete transaction: ${err.message}`);
+    }
+  };
 
   // Create new branch
   const handleAddBranch = async (e: React.FormEvent) => {
@@ -150,14 +378,18 @@ export default function AdminApp() {
     try {
       const updatedItem = {
         name: item.name,
-        price: item.price,
+        price_normal: item.price_normal,
+        price_gofood: item.price_gofood,
+        price_grabfood: item.price_grabfood,
+        price_shopee: item.price_shopee,
         description: item.description,
         category: item.category,
         branch_name: item.branch_name,
         is_available: !item.is_available,
         image_url: item.image_url,
         stock_count: item.stock_count,
-        cost: item.cost
+        cost: item.cost,
+        addons: item.addons
       };
       const savedItem = await ApiService.updateMenuItem(item.id, updatedItem);
       setMenuItems(prev => prev.map(m => m.id === savedItem.id ? savedItem : m));
@@ -166,16 +398,145 @@ export default function AdminApp() {
     }
   };
 
+  // Handle Drag End
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const oldIndex = menuItems.findIndex((item) => item.id === active.id);
+      const newIndex = menuItems.findIndex((item) => item.id === over.id);
+
+      const reorderedItems = arrayMove(menuItems, oldIndex, newIndex);
+      
+      // Compute new sort order based on position (e.g. sequentially)
+      // For a quick robust fix, we update all items in the array to index + 1
+      const payload = reorderedItems.map((item, idx) => ({
+        id: item.id,
+        sort_order: idx
+      }));
+
+      // Optimistically update
+      setMenuItems(reorderedItems);
+
+      try {
+        await ApiService.reorderMenuItems(payload);
+      } catch (err: any) {
+        alert("Failed to save reorder: " + err.message);
+        loadAdminData(); // Refresh from backend if it fails
+      }
+    }
+  };
+  // Handle Drag End for Ingredients
+  const handleIngredientDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const oldIndex = ingredients.findIndex((item) => item.id === active.id);
+      const newIndex = ingredients.findIndex((item) => item.id === over.id);
+
+      const reorderedItems = arrayMove(ingredients, oldIndex, newIndex);
+      
+      const payload = reorderedItems.map((item, idx) => ({
+        id: item.id,
+        sort_order: idx
+      }));
+
+      setIngredients(reorderedItems);
+
+      try {
+        await ApiService.reorderIngredients(payload);
+      } catch (err: any) {
+        alert("Failed to save reorder: " + err.message);
+        loadAdminData();
+      }
+    }
+  };
+
+  const resetIngredientForm = () => {
+    setEditingIngredient(null);
+    setIngredientFormName("");
+    setIngredientFormUnit("pcs");
+    setIngredientFormStock("0");
+    setIngredientFormBranch(selectedBranchFilter || (branches[0]?.name || ""));
+  };
+
+  const handleEditIngredientSelect = (item: any) => {
+    setEditingIngredient(item);
+    setIngredientFormName(item.name);
+    setIngredientFormUnit(item.unit);
+    setIngredientFormStock(item.stock_qty.toString());
+    setIngredientFormBranch(item.branch_name);
+  };
+
+  const handleIngredientFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ingredientFormName || !ingredientFormUnit || !ingredientFormBranch) return;
+
+    try {
+      if (editingIngredient) {
+        const amt = parseFloat(ingredientFormStock) || 0;
+        await ApiService.updateIngredient(editingIngredient.id, {
+          name: ingredientFormName,
+          unit: ingredientFormUnit,
+          stock_qty: amt,
+          branch_name: ingredientFormBranch
+        });
+        alert("Ingredient updated successfully.");
+        loadAdminData();
+      } else {
+        const newIng = await ApiService.createIngredient({
+          name: ingredientFormName,
+          unit: ingredientFormUnit,
+          stock_qty: parseFloat(ingredientFormStock) || 0,
+          branch_name: ingredientFormBranch
+        });
+        setIngredients(prev => [...prev, newIng]);
+        alert("Ingredient created successfully.");
+      }
+      setIsIngredientModalOpen(false);
+      resetIngredientForm();
+    } catch (err: any) {
+      alert(`Failed to save ingredient: ${err.message}`);
+    }
+  };
+
+  const handleStockAdjustment = async (action: "add" | "deduct" | "set") => {
+    if (!adjustStockIngredient) return;
+    const amount = parseFloat(adjustStockAmount);
+    if (isNaN(amount)) return;
+
+    let newQty = adjustStockIngredient.stock_qty;
+    if (action === "add") {
+      newQty += amount;
+    } else if (action === "deduct") {
+      newQty -= amount;
+    } else if (action === "set") {
+      newQty = amount;
+    }
+
+    try {
+      await ApiService.updateIngredientStock(adjustStockIngredient.id, newQty);
+      setIngredients(prev => prev.map(i => i.id === adjustStockIngredient.id ? { ...i, stock_qty: newQty } : i));
+      setAdjustStockIngredient(null);
+      setAdjustStockAmount("");
+      loadAdminData(); // Optionally refresh full data to update BOM stock if needed
+    } catch (err: any) {
+      alert("Failed to update stock: " + err.message);
+    }
+  };
+
   // Reset menu form
   const resetMenuForm = () => {
     setEditingMenuItem(null);
     setMenuFormName("");
     setMenuFormPrice("");
+    setMenuFormGoFood("");
+    setMenuFormGrabFood("");
+    setMenuFormShopee("");
     setMenuFormDesc("");
     setMenuFormImage("");
-    setMenuFormStock("15");
+    setMenuFormStock("0");
     setMenuFormCost("10000");
     setMenuFormAddons("");
+    setMenuFormIngredients([]);
   };
 
   // Submit Menu Item Edit/Create Form
@@ -193,15 +554,21 @@ export default function AdminApp() {
 
     const payload = {
       name: menuFormName,
-      price: parseFloat(menuFormPrice),
+      price_normal: parseFloat(menuFormPrice),
+      price_gofood: menuFormGoFood ? parseFloat(menuFormGoFood) : null,
+      price_grabfood: menuFormGrabFood ? parseFloat(menuFormGrabFood) : null,
+      price_shopee: menuFormShopee ? parseFloat(menuFormShopee) : null,
       description: menuFormDesc,
       category: menuFormCategory,
       branch_name: menuFormBranch,
-      is_available: finalStock > 0 ? menuFormAvailable : false,
+      is_available: menuFormAvailable,
       image_url: menuFormImage || FALLBACK_IMAGE_URL,
-      stock_count: finalStock,
       cost: finalCost,
-      addons: finalAddons
+      addons: finalAddons,
+      ingredients: menuFormIngredients.map(ing => ({
+        ingredient_id: ing.ingredient_id,
+        required_qty: parseFloat(ing.required_qty)
+      }))
     };
 
     try {
@@ -224,15 +591,22 @@ export default function AdminApp() {
   const handleEditMenuItemSelect = (item: MenuItem) => {
     setEditingMenuItem(item);
     setMenuFormName(item.name);
-    setMenuFormPrice(item.price.toString());
+    setMenuFormPrice(item.price_normal.toString());
+    setMenuFormGoFood(item.price_gofood ? item.price_gofood.toString() : "");
+    setMenuFormGrabFood(item.price_grabfood ? item.price_grabfood.toString() : "");
+    setMenuFormShopee(item.price_shopee ? item.price_shopee.toString() : "");
     setMenuFormDesc(item.description);
     setMenuFormCategory(item.category);
     setMenuFormBranch(item.branch_name);
     setMenuFormAvailable(item.is_available);
     setMenuFormImage(item.image_url);
-    setMenuFormStock(item.stock_count !== undefined ? item.stock_count.toString() : "15");
-    setMenuFormCost(item.cost !== undefined ? item.cost.toString() : Math.round(item.price * 0.5).toString());
+    setMenuFormStock(item.stock_count !== undefined ? item.stock_count.toString() : "0");
+    setMenuFormCost(item.cost !== undefined ? item.cost.toString() : Math.round(item.price_normal * 0.5).toString());
     setMenuFormAddons(item.addons ? item.addons.join(", ") : "");
+    setMenuFormIngredients(item.ingredients ? item.ingredients.map(ing => ({
+      ingredient_id: ing.ingredient_id,
+      required_qty: ing.required_qty.toString()
+    })) : []);
   };
 
   const handleAddCategorySubmit = async (e: React.FormEvent) => {
@@ -372,8 +746,10 @@ export default function AdminApp() {
       <div className="bg-stone-900 px-6 border-b border-stone-850 flex gap-4 shrink-0 text-white">
         {[
           { id: "dashboard", label: "📈 Dashboard Analytics" },
+          { id: "transactions", label: "🧾 Transactions Detail" },
           { id: "branches", label: "🏬 Branch Settings" },
-          { id: "menu", label: "🍳 Dish Menu Editor" }
+          { id: "menu", label: "🍳 Dish Menu Editor" },
+          { id: "inventory", label: "📦 Inventory Management" }
         ].map(tab => (
           <button
             key={tab.id}
@@ -416,20 +792,20 @@ export default function AdminApp() {
                 <h4 className="font-extrabold text-sm text-stone-900 uppercase tracking-wider">Timeline Analytical Window</h4>
                 <p className="text-[10px] text-stone-500 font-mono uppercase mt-0.5">Filter by date range — powered by backend aggregation</p>
               </div>
-              <div className="flex gap-1 bg-stone-100 p-1 border border-stone-200 self-stretch sm:self-auto">
-                {(["daily", "weekly", "monthly", "yearly"] as const).map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setAnalyticsTimeframe(t)}
-                    className={`flex-1 sm:flex-initial px-3 py-1.5 font-bold text-[10px] uppercase tracking-wider font-mono transition-all ${
-                      analyticsTimeframe === t
-                        ? "bg-stone-900 text-white"
-                        : "text-stone-500 hover:text-stone-900 hover:bg-stone-200"
-                    }`}
-                  >
-                    {t}
-                  </button>
-                ))}
+              <div className="flex gap-2 text-xs font-mono items-center self-stretch sm:self-auto">
+                <input 
+                  type="date" 
+                  value={analyticsStartDate} 
+                  onChange={e => setAnalyticsStartDate(e.target.value)}
+                  className="bg-stone-50 border border-stone-300 px-2 py-1.5 focus:outline-none focus:border-orange-600"
+                />
+                <span className="font-bold text-stone-400">to</span>
+                <input 
+                  type="date" 
+                  value={analyticsEndDate} 
+                  onChange={e => setAnalyticsEndDate(e.target.value)}
+                  className="bg-stone-50 border border-stone-300 px-2 py-1.5 focus:outline-none focus:border-orange-600"
+                />
               </div>
             </div>
 
@@ -446,7 +822,7 @@ export default function AdminApp() {
                   <h3 className="text-2xl font-black text-stone-900 font-sans tracking-tight">
                     Rp {analytics.total_revenue.toLocaleString("id-ID")}
                   </h3>
-                  <p className="text-[10px] text-stone-400 mt-1 font-mono uppercase tracking-wider">Based on {analyticsTimeframe} timeline</p>
+                  <p className="text-[10px] text-stone-400 mt-1 font-mono uppercase tracking-wider">Based on custom timeline</p>
                 </div>
                 <div className="absolute right-[-20px] bottom-[-20px] opacity-5">
                   <CircleDollarSign className="w-24 h-24 text-stone-900" />
@@ -526,7 +902,7 @@ export default function AdminApp() {
                     className="w-full bg-transparent text-stone-900 focus:outline-none border-0 p-0 font-bold cursor-pointer text-xs uppercase"
                   >
                     <option value="all">All Categories</option>
-                    {categories.map(cat => (
+                    {Array.from(new Set(menuItems.map(item => item.category))).map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
@@ -699,6 +1075,120 @@ export default function AdminApp() {
           </div>
         )}
 
+        {/* TRANSACTIONS DETAIL VIEW */}
+        {activeTab === "transactions" && (
+          <div className="bg-white border-2 border-stone-900 rounded-none shadow-[4px_4px_0px_0px_rgba(0,0,0,0.9)] overflow-hidden">
+            <div className="p-4 border-b-2 border-stone-900 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h4 className="font-black text-sm text-stone-900 uppercase tracking-wider flex items-center gap-2">
+                  <History className="w-5 h-5 text-orange-600" /> Transactions Audit Log
+                </h4>
+                <p className="text-[10px] text-stone-500 font-mono uppercase mt-0.5">Historical orders and operational performance</p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <div className="relative">
+                  <input 
+                    type="text" 
+                    placeholder="Search Name, ID, Status..." 
+                    value={transactionsSearch}
+                    onChange={e => setTransactionsSearch(e.target.value)}
+                    className="w-full sm:w-48 pl-8 pr-3 py-1.5 bg-stone-50 border border-stone-300 text-xs font-mono focus:outline-none focus:border-orange-600"
+                  />
+                  <Search className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-2" />
+                </div>
+                <div className="flex gap-2 text-xs font-mono items-center">
+                  <input 
+                    type="date" 
+                    value={transactionsStartDate} 
+                    onChange={e => setTransactionsStartDate(e.target.value)}
+                    className="bg-stone-50 border border-stone-300 px-2 py-1.5 focus:outline-none focus:border-orange-600"
+                  />
+                  <span className="font-bold text-stone-400">to</span>
+                  <input 
+                    type="date" 
+                    value={transactionsEndDate} 
+                    onChange={e => setTransactionsEndDate(e.target.value)}
+                    className="bg-stone-50 border border-stone-300 px-2 py-1.5 focus:outline-none focus:border-orange-600"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-stone-100 border-b-2 border-stone-900 text-stone-900 uppercase text-[10px] tracking-wider">
+                    <th className="p-3 font-black whitespace-nowrap">Order Time</th>
+                    <th className="p-3 font-black whitespace-nowrap">Order ID</th>
+                    <th className="p-3 font-black whitespace-nowrap">Customer</th>
+                    <th className="p-3 font-black whitespace-nowrap">Phone</th>
+                    <th className="p-3 font-black whitespace-nowrap">Branch</th>
+                    <th className="p-3 font-black whitespace-nowrap">Type</th>
+                    <th className="p-3 font-black whitespace-nowrap">Table</th>
+                    <th className="p-3 font-black whitespace-nowrap">Total</th>
+                    <th className="p-3 font-black whitespace-nowrap">Status</th>
+                    <th className="p-3 font-black text-right text-orange-700 whitespace-nowrap">Order ➜ Serve</th>
+                    <th className="p-3 font-black text-right text-emerald-700 whitespace-nowrap">Serve ➜ Pay</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-150">
+                  {isLoadingTransactions ? (
+                    <tr><td colSpan={11} className="p-8 text-center text-stone-400 font-mono text-xs uppercase tracking-widest">Loading transactions...</td></tr>
+                  ) : transactions.length === 0 ? (
+                    <tr><td colSpan={11} className="p-8 text-center text-stone-400 font-mono text-xs uppercase tracking-widest">No transactions found for this date range.</td></tr>
+                  ) : (
+                    transactions
+                      .filter(o => 
+                        !transactionsSearch || 
+                        o.customer_name?.toLowerCase().includes(transactionsSearch.toLowerCase()) || 
+                        o.status.toLowerCase().includes(transactionsSearch.toLowerCase()) || 
+                        (o.daily_order_number || o.id).toString() === transactionsSearch
+                      )
+                      .map(order => (
+                      <tr 
+                        key={order.id} 
+                        onClick={() => setTransactionReceiptOrder(order)}
+                        className="hover:bg-orange-50 transition-colors cursor-pointer group"
+                      >
+                        <td className="p-3 font-mono text-[10px] text-stone-600 whitespace-nowrap">{formatLocalTime(order.created_at)}</td>
+                        <td className="p-3 font-mono font-bold text-stone-900 group-hover:text-orange-600">#{order.daily_order_number || order.id}</td>
+                        <td className="p-3 font-bold text-[11px] uppercase tracking-wider">{order.customer_name || "-"}</td>
+                        <td className="p-3 font-mono text-[10px] text-stone-500">{order.phone_number === "Online" ? "-" : (order.phone_number || "-")}</td>
+                        <td className="p-3 text-[10px] font-bold uppercase tracking-wider">{order.branch_name}</td>
+                        <td className="p-3 text-[10px] font-bold uppercase tracking-wider">{order.order_type}</td>
+                        <td className="p-3 font-mono text-stone-600">{order.table_number || "-"}</td>
+                        <td className="p-3 font-mono font-semibold text-emerald-700 whitespace-nowrap">
+                          Rp {Math.max(0, order.total_amount - (order.discount_amount || 0)).toLocaleString("id-ID")}
+                          {order.discount_amount && order.discount_amount > 0 && (
+                            <div className="text-[9px] text-red-500 font-bold uppercase mt-0.5 px-1 bg-red-100 inline-block rounded-sm">
+                              -{order.discount_amount.toLocaleString("id-ID")}
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                            order.status === "completed" ? "bg-emerald-100 text-emerald-800" :
+                            order.status === "discounted" ? "bg-red-200 text-red-900 border border-red-300 shadow-sm" :
+                            order.status === "on_table" ? "bg-blue-100 text-blue-800" :
+                            order.status === "cooked" ? "bg-orange-100 text-orange-800" :
+                            "bg-stone-100 text-stone-800"
+                          }`}>{order.status === "on_table" ? "Served" : order.status}</span>
+                        </td>
+                        <td className="p-3 font-mono text-[11px] font-black text-right text-orange-600">
+                          {formatDuration(order.created_at, order.served_at)}
+                        </td>
+                        <td className="p-3 font-mono text-[11px] font-black text-right text-emerald-600">
+                          {formatDuration(order.served_at, order.paid_at)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* 2. BRANCH CONFIGURATION VIEW */}
         {activeTab === "branches" && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -796,14 +1286,156 @@ export default function AdminApp() {
 
         {/* 3. MENU DISH EDITOR VIEW */}
         {activeTab === "menu" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="bg-white border-2 border-stone-900 rounded-none p-6 lg:col-span-1 h-fit sticky top-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.9)] text-stone-900">
-              <h4 className="font-black text-sm text-stone-900 mb-4 flex items-center gap-2 uppercase tracking-wider border-b border-stone-200 pb-2">
-                <ChefHat className="w-4 h-4 text-orange-600" />
-                <span>{editingMenuItem ? "Modify Menu Dish" : "Create New Menu Dish"}</span>
-              </h4>
+          <div className="space-y-4">
+            <div className="bg-white border-2 border-stone-900 rounded-none p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.9)] text-stone-900">
+              <div className="flex justify-between items-center mb-4 border-b border-stone-200 pb-3 flex-wrap gap-4">
+                <div className="flex items-center gap-3">
+                  <h4 className="font-black text-sm text-stone-900 uppercase tracking-wider">Active branch menu catalog</h4>
+                  <span className="text-[10px] text-stone-500 font-bold font-mono uppercase bg-stone-100 px-2 py-1">{menuItems.length} dishes synced</span>
+                </div>
+                <button 
+                  onClick={() => {
+                    resetMenuForm();
+                    setIsMenuModalOpen(true);
+                  }} 
+                  className="py-2 px-4 bg-orange-600 hover:bg-orange-500 text-white rounded-none font-bold text-xs uppercase tracking-widest transition-all shadow-md flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Create New Menu Dish
+                </button>
+              </div>
 
-              <form onSubmit={handleMenuFormSubmit} className="space-y-4 text-xs">
+              <div className="mb-6 relative">
+                <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-3.5" />
+                <input type="text" placeholder="Filter dishes by name..." value={menuSearchQuery} onChange={(e) => setMenuSearchQuery(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none pl-8 pr-16 py-2.5 text-xs text-stone-900 focus:outline-none focus:border-orange-600 font-mono" />
+                {menuSearchQuery && (
+                  <button type="button" onClick={() => setMenuSearchQuery("")} className="absolute right-3 top-3 text-stone-400 hover:text-stone-900 text-[10px] font-bold uppercase tracking-wider font-mono cursor-pointer">CLEAR</button>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                {menuItems.filter(item => item.name.toLowerCase().includes(menuSearchQuery.toLowerCase())).length === 0 ? (
+                  <div className="p-8 text-center text-stone-400 font-mono text-xs uppercase border border-dashed border-stone-300">
+                    No dishes match filter.
+                  </div>
+                ) : (
+                  <DndContext 
+                    sensors={sensors} 
+                    collisionDetection={closestCenter} 
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext 
+                      items={menuItems.filter(item => item.name.toLowerCase().includes(menuSearchQuery.toLowerCase())).map(i => i.id)} 
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {menuItems.filter(item => item.name.toLowerCase().includes(menuSearchQuery.toLowerCase())).map(item => (
+                        <SortableMenuItem 
+                          key={item.id} 
+                          item={item} 
+                          onToggleAvailability={handleToggleMenuAvailability} 
+                          onEdit={(i: any) => { handleEditMenuItemSelect(i); setIsMenuModalOpen(true); }}
+                          branchColors={getBranchColorClasses(item.branch_name)}
+                          FALLBACK_IMAGE_URL={FALLBACK_IMAGE_URL}
+                        />
+                      ))}
+                    </SortableContext>
+                  </DndContext>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 5. INVENTORY VIEW */}
+        {activeTab === "inventory" && (
+          <div className="space-y-4">
+            <div className="bg-white border-2 border-stone-900 rounded-none p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.9)] text-stone-900">
+              <div className="flex justify-between items-center mb-4 border-b border-stone-200 pb-3 flex-wrap gap-4">
+                <div className="flex items-center gap-3">
+                  <h4 className="font-black text-sm text-stone-900 uppercase tracking-wider">Active branch ingredients</h4>
+                  <span className="text-[10px] text-stone-500 font-bold font-mono uppercase bg-stone-100 px-2 py-1">{ingredients.length} ingredients</span>
+                </div>
+                <button 
+                  onClick={() => {
+                    resetIngredientForm();
+                    setIsIngredientModalOpen(true);
+                  }} 
+                  className="py-2 px-4 bg-orange-600 hover:bg-orange-500 text-white rounded-none font-bold text-xs uppercase tracking-widest transition-all shadow-md flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Create New Ingredient
+                </button>
+              </div>
+
+              <div className="mb-6 relative">
+                <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-3.5" />
+                <input type="text" placeholder="Filter ingredients by name..." value={ingredientSearchQuery} onChange={(e) => setIngredientSearchQuery(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none pl-8 pr-16 py-2.5 text-xs text-stone-900 focus:outline-none focus:border-orange-600 font-mono" />
+                {ingredientSearchQuery && (
+                  <button type="button" onClick={() => setIngredientSearchQuery("")} className="absolute right-3 top-3 text-stone-400 hover:text-stone-900 text-[10px] font-bold uppercase tracking-wider font-mono cursor-pointer">CLEAR</button>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                {ingredients.filter(item => item.name.toLowerCase().includes(ingredientSearchQuery.toLowerCase())).length === 0 ? (
+                  <div className="p-8 text-center text-stone-400 font-mono text-xs uppercase border border-dashed border-stone-300">
+                    No ingredients match filter.
+                  </div>
+                ) : (
+                  <DndContext 
+                    sensors={sensors} 
+                    collisionDetection={closestCenter} 
+                    onDragEnd={handleIngredientDragEnd}
+                  >
+                    <SortableContext 
+                      items={ingredients.filter(item => item.name.toLowerCase().includes(ingredientSearchQuery.toLowerCase())).map(i => i.id)} 
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {ingredients.filter(item => item.name.toLowerCase().includes(ingredientSearchQuery.toLowerCase())).map(item => (
+                        <SortableIngredientItem 
+                          key={item.id} 
+                          item={item}
+                          onUpdateStock={(ing) => {
+                            setAdjustStockIngredient(ing);
+                            setAdjustStockAmount("");
+                          }}
+                          onEdit={(i: any) => { handleEditIngredientSelect(i); setIsIngredientModalOpen(true); }}
+                          onDelete={async (id: number) => {
+                            if (window.confirm("Are you sure you want to delete this ingredient?")) {
+                              await ApiService.deleteIngredient(id);
+                              setIngredients(prev => prev.filter(i => i.id !== id));
+                            }
+                          }}
+                          branchColors={getBranchColorClasses(item.branch_name).bg.replace('bg-', 'bg-').replace('50', '500')}
+                        />
+                      ))}
+                    </SortableContext>
+                  </DndContext>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Menu Editor Modal */}
+      {isMenuModalOpen && (
+        <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border-2 border-stone-900 w-full max-w-3xl shadow-[8px_8px_0px_0px_rgba(0,0,0,0.9)] rounded-none flex flex-col max-h-[95vh]">
+            <div className="p-4 bg-stone-900 text-white flex justify-between items-center shrink-0">
+              <h3 className="font-black text-sm uppercase flex items-center gap-2">
+                <ChefHat className="w-4 h-4 text-orange-500" />
+                {editingMenuItem ? "Modify Menu Dish" : "Create New Menu Dish"}
+              </h3>
+              <button 
+                onClick={() => { setIsMenuModalOpen(false); resetMenuForm(); }}
+                className="text-stone-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto font-mono text-xs flex-1 text-stone-900">
+              <form onSubmit={(e) => { handleMenuFormSubmit(e); setIsMenuModalOpen(false); }} className="space-y-4">
                 <div>
                   <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Dish Name</label>
                   <input type="text" required placeholder="e.g. Rawon Super Pedas" value={menuFormName} onChange={(e) => setMenuFormName(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-3 py-2.5 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
@@ -811,13 +1443,25 @@ export default function AdminApp() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Price (Rp)</label>
+                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Dine-In Price</label>
                     <input type="number" required placeholder="e.g. 45000" value={menuFormPrice} onChange={(e) => setMenuFormPrice(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-3 py-2.5 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
                   </div>
                   <div>
+                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">GoFood Price</label>
+                    <input type="number" placeholder="Optional" value={menuFormGoFood} onChange={(e) => setMenuFormGoFood(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-3 py-2.5 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">GrabFood Price</label>
+                    <input type="number" placeholder="Optional" value={menuFormGrabFood} onChange={(e) => setMenuFormGrabFood(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-3 py-2.5 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">ShopeeFood Price</label>
+                    <input type="number" placeholder="Optional" value={menuFormShopee} onChange={(e) => setMenuFormShopee(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-3 py-2.5 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
                     <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Category</label>
                     <select value={menuFormCategory} onChange={(e) => setMenuFormCategory(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-3 py-2.5 text-stone-900 focus:outline-none focus:border-orange-600 text-xs cursor-pointer font-bold font-mono">
-                      {categories.map(cat => (
+                      {Array.from(new Set(menuItems.map(item => item.category))).map(cat => (
                         <option key={cat} value={cat}>{cat.toUpperCase()}</option>
                       ))}
                     </select>
@@ -833,13 +1477,52 @@ export default function AdminApp() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Stock (Qty)</label>
-                    <input type="number" required min="0" value={menuFormStock} onChange={(e) => setMenuFormStock(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-3 py-2.5 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
+                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Calculated Stock</label>
+                    <input type="text" readOnly value={menuFormStock} className="w-full bg-stone-200 border border-stone-300 rounded-none px-3 py-2.5 text-stone-500 focus:outline-none text-xs font-mono cursor-not-allowed" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Cost (Rp)</label>
                     <input type="number" required min="0" value={menuFormCost} onChange={(e) => setMenuFormCost(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-3 py-2.5 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
                   </div>
+                </div>
+
+                <div className="border border-stone-300 bg-stone-50 p-4 rounded-none">
+                  <div className="flex justify-between items-center mb-3">
+                    <label className="block text-[10px] font-bold text-stone-900 uppercase tracking-widest font-mono">Bill of Materials (Ingredients)</label>
+                    <button type="button" onClick={() => setMenuFormIngredients([...menuFormIngredients, { ingredient_id: ingredients[0]?.id || 0, required_qty: "1" }])} className="px-2 py-1 bg-stone-900 text-white text-[9px] font-bold uppercase tracking-wider flex items-center gap-1">
+                      <Plus className="w-3 h-3" /> Add Ingredient
+                    </button>
+                  </div>
+                  {menuFormIngredients.length === 0 ? (
+                    <p className="text-[10px] text-stone-500 font-mono italic">No ingredients assigned. Stock will calculate as 0.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {menuFormIngredients.map((mi, idx) => (
+                        <div key={idx} className="flex gap-2 items-center">
+                          <select value={mi.ingredient_id} onChange={(e) => {
+                            const newIngs = [...menuFormIngredients];
+                            newIngs[idx].ingredient_id = parseInt(e.target.value);
+                            setMenuFormIngredients(newIngs);
+                          }} className="flex-1 bg-white border border-stone-300 rounded-none px-2 py-1.5 text-stone-900 text-xs font-mono font-bold">
+                            {ingredients.map(ing => (
+                              <option key={ing.id} value={ing.id}>{ing.name} ({ing.unit})</option>
+                            ))}
+                          </select>
+                          <input type="number" step="0.01" min="0.01" value={mi.required_qty} onChange={(e) => {
+                            const newIngs = [...menuFormIngredients];
+                            newIngs[idx].required_qty = e.target.value;
+                            setMenuFormIngredients(newIngs);
+                          }} className="w-20 bg-white border border-stone-300 rounded-none px-2 py-1.5 text-stone-900 text-xs font-mono" placeholder="Qty" />
+                          <button type="button" onClick={() => {
+                            const newIngs = menuFormIngredients.filter((_, i) => i !== idx);
+                            setMenuFormIngredients(newIngs);
+                          }} className="p-1.5 bg-red-50 text-red-600 border border-red-200 hover:bg-red-100">
+                            <Trash className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -873,89 +1556,241 @@ export default function AdminApp() {
                   </button>
                 </div>
 
-                <div className="flex gap-2">
-                  <button type="submit" className="flex-1 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-none font-bold text-xs uppercase tracking-widest transition-all">{editingMenuItem ? "Save changes" : "Deploy Dish"}</button>
-                  {editingMenuItem && (
-                    <button type="button" onClick={resetMenuForm} className="px-4 py-3 bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-none font-bold text-xs uppercase">Cancel</button>
-                  )}
+                <div className="flex gap-2 pt-4 border-t border-stone-200">
+                  <button type="submit" className="flex-1 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-none font-bold text-xs uppercase tracking-widest transition-all shadow-md">{editingMenuItem ? "Save changes" : "Deploy Dish"}</button>
+                  <button type="button" onClick={() => { setIsMenuModalOpen(false); resetMenuForm(); }} className="px-6 py-3 bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-none font-bold text-xs uppercase shadow-sm">Cancel</button>
                 </div>
               </form>
             </div>
+          </div>
+        </div>
+      )}
 
-            <div className="lg:col-span-2 space-y-4">
-              <div className="bg-white border-2 border-stone-900 rounded-none p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.9)] text-stone-900">
-                <div className="flex justify-between items-center mb-4 border-b border-stone-200 pb-3">
-                  <h4 className="font-black text-sm text-stone-900 uppercase tracking-wider">Active branch menu catalog</h4>
-                  <span className="text-[10px] text-stone-500 font-bold font-mono uppercase">{menuItems.length} dishes synced</span>
+      {/* Ingredient Editor Modal */}
+      {isIngredientModalOpen && (
+        <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border-2 border-stone-900 w-full max-w-lg shadow-[8px_8px_0px_0px_rgba(0,0,0,0.9)] rounded-none flex flex-col max-h-[90vh]">
+            <div className="p-4 bg-stone-900 text-white flex justify-between items-center shrink-0">
+              <h3 className="font-black text-sm uppercase flex items-center gap-2">
+                <ShoppingBag className="w-4 h-4 text-orange-500" />
+                {editingIngredient ? "Edit Ingredient Details" : "Configure New Ingredient"}
+              </h3>
+              <button onClick={() => { setIsIngredientModalOpen(false); resetIngredientForm(); }} className="text-stone-400 hover:text-white transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto font-mono text-xs flex-1 text-stone-900">
+              <form onSubmit={handleIngredientFormSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Ingredient Name</label>
+                  <input type="text" required placeholder="e.g. Daging Rawon" value={ingredientFormName} onChange={(e) => setIngredientFormName(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-3 py-2.5 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
                 </div>
 
-                <div className="mb-4 relative">
-                  <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-3.5" />
-                  <input type="text" placeholder="Filter dishes by name..." value={menuSearchQuery} onChange={(e) => setMenuSearchQuery(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none pl-8 pr-16 py-2.5 text-xs text-stone-900 focus:outline-none focus:border-orange-600 font-mono" />
-                  {menuSearchQuery && (
-                    <button type="button" onClick={() => setMenuSearchQuery("")} className="absolute right-3 top-3 text-stone-400 hover:text-stone-900 text-[10px] font-bold uppercase tracking-wider font-mono cursor-pointer">CLEAR</button>
-                  )}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Unit</label>
+                    <input type="text" required placeholder="e.g. gr, pcs, portion" value={ingredientFormUnit} onChange={(e) => setIngredientFormUnit(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-3 py-2.5 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Initial Stock</label>
+                    <input type="number" step="any" required value={ingredientFormStock} onChange={(e) => setIngredientFormStock(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-3 py-2.5 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
+                  </div>
                 </div>
 
-                <div className="space-y-3">
-                  {menuItems.filter(item => item.name.toLowerCase().includes(menuSearchQuery.toLowerCase())).length === 0 ? (
-                    <div className="p-8 text-center text-stone-400 font-mono text-xs uppercase border border-dashed border-stone-300">
-                      No dishes match filter.
+                <div>
+                  <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Branch</label>
+                  <select required value={ingredientFormBranch} onChange={(e) => setIngredientFormBranch(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-3 py-2.5 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono font-bold cursor-pointer">
+                    <option value="">Select branch...</option>
+                    {branches.map(b => (
+                      <option key={b.name} value={b.name}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex gap-2 pt-4 border-t border-stone-200">
+                  <button type="submit" className="flex-1 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-none font-bold text-xs uppercase tracking-widest transition-all shadow-md">{editingIngredient ? "Save changes" : "Create Ingredient"}</button>
+                  <button type="button" onClick={() => { setIsIngredientModalOpen(false); resetIngredientForm(); }} className="px-6 py-3 bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-none font-bold text-xs uppercase shadow-sm">Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Transaction Receipt Modal */}
+      {transactionReceiptOrder && (
+        <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border-2 border-stone-900 w-full max-w-md shadow-[8px_8px_0px_0px_rgba(0,0,0,0.9)] rounded-none flex flex-col max-h-[90vh]">
+            <div className="p-4 bg-stone-900 text-white flex justify-between items-center shrink-0">
+              <h3 className="font-black text-sm uppercase flex items-center gap-2">
+                <Receipt className="w-4 h-4 text-orange-500" />
+                {["cooking", "cooked", "on_table"].includes(transactionReceiptOrder.status) ? "Kitchen Ticket" : "Final Cashier Receipt"}
+              </h3>
+              <button 
+                onClick={() => setTransactionReceiptOrder(null)}
+                className="text-stone-400 hover:text-white transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto font-mono text-xs flex-1 text-stone-900">
+              {/* Common Header */}
+              <div className="text-center mb-6">
+                <h4 className="font-black text-lg uppercase tracking-widest border-b-2 border-stone-900 pb-2 mb-2">Rawon TM</h4>
+                <p className="font-bold">Branch: {transactionReceiptOrder.branch_name}</p>
+                <p>Order #{transactionReceiptOrder.daily_order_number || transactionReceiptOrder.id} • {formatLocalTime(transactionReceiptOrder.created_at)}</p>
+                <p className="mt-2 bg-stone-100 p-1 border border-stone-300 font-bold uppercase">
+                  {transactionReceiptOrder.order_type} {transactionReceiptOrder.order_type === "dine-in" && `- Table ${transactionReceiptOrder.table_number}`}
+                </p>
+                {transactionReceiptOrder.customer_name && (
+                  <p className="mt-1 font-bold">Customer: {transactionReceiptOrder.customer_name}</p>
+                )}
+                {transactionReceiptOrder.phone_number && transactionReceiptOrder.phone_number !== "Online" && (
+                  <p className="mt-1">Phone: {transactionReceiptOrder.phone_number}</p>
+                )}
+              </div>
+
+              {/* Items Render */}
+              <div className="border-t border-b border-dashed border-stone-400 py-4 mb-4">
+                {transactionReceiptOrder.items.map((item, idx) => (
+                  <div key={idx} className="mb-3 last:mb-0">
+                    <div className="flex justify-between items-start font-bold uppercase">
+                      <div className="flex-1 pr-4">
+                        <span>{item.quantity}x {item.menu_item.name}</span>
+                        {item.special_notes && (
+                          <p className="text-[10px] text-stone-500 lowercase mt-0.5 ml-4">
+                            ↳ note: {item.special_notes}
+                          </p>
+                        )}
+                      </div>
+                      {["completed", "discounted"].includes(transactionReceiptOrder.status) && (
+                        <span className="shrink-0 text-right">
+                          Rp {(item.menu_item.price_normal * item.quantity).toLocaleString("id-ID")}
+                        </span>
+                      )}
                     </div>
-                  ) : (
-                    menuItems.filter(item => item.name.toLowerCase().includes(menuSearchQuery.toLowerCase())).map(item => {
-                      const itemStock = item.stock_count ?? 0;
-                      const itemCost = item.cost ?? Math.round(item.price * 0.5);
-                      const grossProfit = item.price - itemCost;
-                      const grossMarginPercent = item.price > 0 ? Math.round((grossProfit / item.price) * 100) : 0;
-                      const branchColors = getBranchColorClasses(item.branch_name);
+                  </div>
+                ))}
+              </div>
 
-                      return (
-                        <div key={item.id} className="p-3 bg-stone-50 rounded-none border border-stone-200 hover:border-stone-400 transition-colors flex flex-col sm:flex-row justify-between gap-3 group">
-                          <div className="flex gap-3">
-                            <img src={item.image_url || FALLBACK_IMAGE_URL} alt={item.name} referrerPolicy="no-referrer" className="w-16 h-16 object-cover rounded-none bg-stone-200 shrink-0 border border-stone-300" />
-                            <div className="flex-1">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <p className="font-bold text-xs text-stone-900 group-hover:text-orange-600 transition-colors uppercase">{item.name}</p>
-                                <span className={`text-[8px] font-black uppercase px-1 py-0.5 border leading-none ${branchColors.bg} ${branchColors.text} ${branchColors.border}`}>
-                                  {item.branch_name}
-                                </span>
-                              </div>
-                              <p className="text-[10px] text-stone-500 mt-1 line-clamp-1">{item.description || "No description."}</p>
-                              <div className="flex flex-wrap gap-1.5 mt-2 font-mono">
-                                <span className="text-[9px] bg-stone-200 text-stone-700 px-1.5 py-0.5 rounded-none font-bold uppercase">{item.category}</span>
-                                {itemStock === 0 ? (
-                                  <span className="text-[9px] bg-red-100 text-red-700 border border-red-200 px-1.5 py-0.5 rounded-none font-bold uppercase">Out of Stock</span>
-                                ) : (
-                                  <span className={`text-[9px] border px-1.5 py-0.5 rounded-none font-bold uppercase ${itemStock < 5 ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-stone-100 text-stone-700 border-stone-300"}`}>Stock: {itemStock}</span>
-                                )}
-                                <span className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded-none font-mono">
-                                  Cost: Rp {itemCost.toLocaleString("id-ID")} ({grossMarginPercent}% margin)
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex sm:flex-col items-end justify-between text-right shrink-0">
-                            <span className="font-bold text-xs text-orange-600 font-mono">Rp {item.price.toLocaleString("id-ID")}</span>
-                            <div className="flex items-center gap-2 mt-2">
-                              <button onClick={() => handleToggleMenuAvailability(item)} disabled={itemStock === 0} className={`text-[10px] font-bold uppercase px-2 py-1 rounded-none bg-white border font-mono ${itemStock === 0 ? "text-stone-400 border-stone-200 bg-stone-100 cursor-not-allowed" : "hover:bg-stone-100 border-stone-300 text-stone-700"}`}>
-                                {itemStock === 0 ? <span className="text-stone-400">Unavailable</span> : item.is_available ? <span className="text-emerald-600">Available</span> : <span className="text-red-500">Suspended</span>}
-                              </button>
-                              <button onClick={() => handleEditMenuItemSelect(item)} className="p-1.5 bg-stone-200 hover:bg-stone-300 rounded-none text-stone-700 transition-all">
-                                <Edit className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
+              {/* Totals (Only for completed or discounted) */}
+              {["completed", "discounted"].includes(transactionReceiptOrder.status) && (
+                <div className="space-y-1">
+                  <div className="flex justify-between text-stone-600">
+                    <span>Subtotal</span>
+                    <span>Rp {(transactionReceiptOrder.total_amount - transactionReceiptOrder.tax_amount).toLocaleString("id-ID")}</span>
+                  </div>
+                  <div className="flex justify-between text-stone-600 border-b border-stone-300 pb-2 mb-2">
+                    <span>Tax</span>
+                    <span>Rp {transactionReceiptOrder.tax_amount.toLocaleString("id-ID")}</span>
+                  </div>
+                  <div className="flex justify-between font-black text-sm uppercase">
+                    <span>Total Amount</span>
+                    <span>Rp {transactionReceiptOrder.total_amount.toLocaleString("id-ID")}</span>
+                  </div>
+                  {transactionReceiptOrder.discount_amount && transactionReceiptOrder.discount_amount > 0 && (
+                    <div className="flex justify-between text-red-600 font-bold border-t border-red-200 pt-2 mt-2">
+                      <div className="flex flex-col">
+                        <span>Discount / Write-Off</span>
+                        <span className="text-[9px] lowercase italic text-red-400">reason: {transactionReceiptOrder.discount_reason}</span>
+                      </div>
+                      <span>- Rp {transactionReceiptOrder.discount_amount.toLocaleString("id-ID")}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-black text-sm uppercase pt-2 border-t border-stone-800 mt-2">
+                    <span>Final Paid</span>
+                    <span>Rp {Math.max(0, transactionReceiptOrder.total_amount - (transactionReceiptOrder.discount_amount || 0)).toLocaleString("id-ID")}</span>
+                  </div>
+                  {transactionReceiptOrder.payment_method && (
+                    <div className="flex justify-between font-bold text-[10px] uppercase mt-2">
+                      <span>Paid Via</span>
+                      <span className="bg-emerald-100 text-emerald-800 px-1 border border-emerald-300">{transactionReceiptOrder.payment_method}</span>
+                    </div>
+                  )}
+                  {transactionReceiptOrder.paid_at && (
+                    <div className="text-center text-[9px] text-stone-400 mt-6">
+                      Paid at: {formatLocalTime(transactionReceiptOrder.paid_at)}
+                    </div>
                   )}
                 </div>
+              )}
+
+              {/* Danger Zone */}
+              <div className="mt-8 border-t-2 border-red-200 pt-4">
+                <button 
+                  onClick={() => handleDeleteTransaction(transactionReceiptOrder.id)}
+                  className="w-full py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-colors"
+                >
+                  <Trash className="w-3.5 h-3.5" />
+                  Delete Transaction
+                </button>
               </div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Stock Adjustment Modal */}
+      {adjustStockIngredient && (
+        <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border-2 border-stone-900 w-full max-w-sm shadow-[8px_8px_0px_0px_rgba(0,0,0,0.9)] rounded-none flex flex-col">
+            <div className="p-4 bg-stone-900 text-white flex justify-between items-center shrink-0">
+              <h3 className="font-black text-sm uppercase flex items-center gap-2">
+                <ArrowUpDown className="w-4 h-4 text-orange-500" />
+                Adjust Stock
+              </h3>
+              <button onClick={() => { setAdjustStockIngredient(null); setAdjustStockAmount(""); }} className="text-stone-400 hover:text-white transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="p-6 text-stone-900 flex flex-col items-center">
+              <h4 className="font-black text-lg text-center uppercase tracking-wider">{adjustStockIngredient.name}</h4>
+              <p className="text-sm font-mono mt-1 mb-6 text-stone-500">
+                Current Stock: <span className="font-bold text-orange-600 text-base">{adjustStockIngredient.stock_qty}</span> {adjustStockIngredient.unit}
+              </p>
+              
+              <div className="w-full mb-6">
+                <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-2 text-left">Adjustment Amount</label>
+                <input 
+                  type="number" 
+                  step="any"
+                  value={adjustStockAmount} 
+                  onChange={(e) => setAdjustStockAmount(e.target.value)} 
+                  placeholder="e.g. 5"
+                  className="w-full bg-stone-50 border-2 border-stone-300 rounded-none px-4 py-3 text-stone-900 focus:outline-none focus:border-stone-900 text-center font-bold text-lg font-mono"
+                  autoFocus
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-2 w-full">
+                <button 
+                  onClick={() => handleStockAdjustment("add")}
+                  disabled={!adjustStockAmount || isNaN(parseFloat(adjustStockAmount))}
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-none font-bold text-xs uppercase tracking-widest transition-all shadow-md flex justify-center items-center gap-2 disabled:opacity-50"
+                >
+                  <Plus className="w-4 h-4" /> Add to Stock
+                </button>
+                <button 
+                  onClick={() => handleStockAdjustment("deduct")}
+                  disabled={!adjustStockAmount || isNaN(parseFloat(adjustStockAmount))}
+                  className="w-full py-3 bg-red-600 hover:bg-red-500 text-white rounded-none font-bold text-xs uppercase tracking-widest transition-all shadow-md flex justify-center items-center gap-2 disabled:opacity-50"
+                >
+                  <Minus className="w-4 h-4" /> Deduct from Stock
+                </button>
+                <button 
+                  onClick={() => handleStockAdjustment("set")}
+                  disabled={!adjustStockAmount || isNaN(parseFloat(adjustStockAmount))}
+                  className="w-full py-3 bg-stone-800 hover:bg-stone-700 text-white rounded-none font-bold text-xs uppercase tracking-widest transition-all shadow-md flex justify-center items-center gap-2 disabled:opacity-50"
+                >
+                  <Equal className="w-4 h-4" /> Set Exact Stock
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

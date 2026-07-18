@@ -32,6 +32,27 @@ export class ApiService {
     localStorage.removeItem(CONFIG_KEYS.USER);
   }
 
+  // In-flight request deduplication map
+  private static inflightRequests = new Map<string, Promise<any>>();
+
+  private static async deduplicatedRequest<T>(
+    key: string,
+    endpoint: string,
+    options: RequestInit & { useCache?: boolean; publicEndpoint?: boolean } = {}
+  ): Promise<T> {
+    if (!options.method || options.method === "GET") {
+      const existing = this.inflightRequests.get(key);
+      if (existing) return existing as Promise<T>;
+
+      const promise = this.request<T>(endpoint, options).finally(() => {
+        this.inflightRequests.delete(key);
+      });
+      this.inflightRequests.set(key, promise);
+      return promise;
+    }
+    return this.request<T>(endpoint, options);
+  }
+
   // --- Core API Helpers ---
   private static async request<T>(
     endpoint: string,
@@ -122,7 +143,15 @@ export class ApiService {
     }
     const qs = params.toString();
     const url = `/menu/${qs ? `?${qs}` : ""}`;
-    return this.request<MenuItem[]>(url, { useCache: true, publicEndpoint: true });
+    return this.deduplicatedRequest<MenuItem[]>("menu:" + (branchName || "all"), url, { useCache: true, publicEndpoint: true });
+  }
+
+  static async reorderMenuItems(items: { id: number; sort_order: number }[]): Promise<{ message: string }> {
+    return this.request<{ message: string }>("/admin/menu/reorder", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items })
+    });
   }
 
   // --- Order Placement & Management ---
@@ -145,13 +174,20 @@ export class ApiService {
   static async updateOrderStatus(
     orderId: number,
     status: OrderStatus,
-    paymentMethod?: "Cash" | "QRIS" | "Debit"
+    paymentMethod?: "Cash" | "QRIS" | "Debit",
+    discountAmount?: number,
+    discountReason?: string
   ): Promise<Order> {
-    const payload: Record<string, string> = { status };
+    const payload: Record<string, any> = { status };
     if (paymentMethod) {
       payload["payment_method"] = paymentMethod;
     }
-
+    if (discountAmount !== undefined) {
+      payload["discount_amount"] = discountAmount;
+    }
+    if (discountReason) {
+      payload["discount_reason"] = discountReason;
+    }
     return this.request<Order>(`/orders/${orderId}/status`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -178,8 +214,23 @@ export class ApiService {
     return this.request<any[]>(`/admin/dish-performance${qs ? `?${qs}` : ""}`);
   }
 
+  static async getTransactions(branchName?: string, startDate?: string, endDate?: string): Promise<Order[]> {
+    const params = new URLSearchParams();
+    if (branchName) params.append("branch_name", branchName);
+    if (startDate) params.append("start_date", startDate);
+    if (endDate) params.append("end_date", endDate);
+    const qs = params.toString();
+    return this.request<Order[]>(`/admin/transactions${qs ? `?${qs}` : ""}`);
+  }
+
+  static async deleteTransaction(orderId: number): Promise<void> {
+    return this.request<void>(`/admin/transactions/${orderId}`, {
+      method: "DELETE"
+    });
+  }
+
   static async getBranches(): Promise<Branch[]> {
-    return this.request<Branch[]>("/branches/", { useCache: true, publicEndpoint: true });
+    return this.deduplicatedRequest<Branch[]>("branches", "/branches/", { useCache: true, publicEndpoint: true });
   }
 
   static async createBranch(branch: Branch): Promise<Branch> {
@@ -206,15 +257,62 @@ export class ApiService {
     });
   }
 
-  static async declineOrderItem(orderId: number, itemId: number): Promise<Order> {
-    return this.request<Order>(`/orders/${orderId}/items/${itemId}/decline`, {
+  static async declineOrderItem(orderId: number, itemId: number): Promise<void> {
+    return this.request<void>(`/orders/${orderId}/items/${itemId}/decline`, {
       method: "POST"
     });
   }
 
+  // --- INGREDIENTS ---
+  static async getIngredients(branchName?: string): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (branchName) params.append("branch_name", branchName);
+    const qs = params.toString();
+    return this.deduplicatedRequest<any[]>("ingredients:" + (branchName || "all"), `/ingredients${qs ? `?${qs}` : ""}`);
+  }
+
+  static async createIngredient(ingredient: any): Promise<any> {
+    return this.request<any>("/ingredients", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(ingredient)
+    });
+  }
+
+  static async reorderIngredients(items: { id: number; sort_order: number }[]): Promise<void> {
+    return this.request<void>("/ingredients/reorder", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(items)
+    });
+  }
+
+  static async updateIngredientStock(id: number, stockQty: number): Promise<any> {
+    return this.request<any>(`/ingredients/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stock_qty: stockQty })
+    });
+  }
+
+  static async updateIngredient(id: number, updateData: any): Promise<any> {
+    return this.request<any>(`/ingredients/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updateData)
+    });
+  }
+
+  static async deleteIngredient(id: number): Promise<void> {
+    return this.request<void>(`/ingredients/${id}`, {
+      method: "DELETE"
+    });
+  }
+
   static async getCategories(): Promise<string[]> {
-    const cats = await this.request<{name: string, created_at: string}[]>("/categories", { useCache: true, publicEndpoint: true });
-    return cats.map(c => c.name);
+    return this.deduplicatedRequest<string[]>("categories", "/categories", { useCache: true, publicEndpoint: true }).then(
+      cats => (cats as any[]).map((c: any) => typeof c === 'string' ? c : c.name)
+    );
   }
 
   static async addCategory(categoryName: string): Promise<string[]> {

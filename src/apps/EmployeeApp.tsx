@@ -3,17 +3,32 @@ import { Order, OrderStatus } from "../types";
 import { ApiService } from "../services/api";
 import { useAuth } from "../hooks/useAuth";
 import LoginScreen from "../components/LoginScreen";
+import EmployeeOrderEntry from "./EmployeeOrderEntry";
 import {
   Flame, Check, ChefHat, LogOut, Clock,
-  MapPin, RefreshCw, AlertCircle
+  MapPin, RefreshCw, AlertCircle, Printer
 } from "lucide-react";
 
-interface KitchenAppProps {
+interface EmployeeAppProps {
   currentBranch: string;
 }
 
-export default function KitchenApp({ currentBranch }: KitchenAppProps) {
-  const auth = useAuth({ allowedRoles: ["kitchen", "admin", "cashier"] });
+const formatTimeElapsed = (totalMinutes: number) => {
+  if (totalMinutes < 60) return `${totalMinutes}m ago`;
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const mins = totalMinutes % 60;
+  
+  let parts = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (mins > 0 || parts.length === 0) parts.push(`${mins}m`);
+  
+  return `${parts.join(" ")} ago`;
+};
+
+export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
+  const auth = useAuth({ allowedRoles: ["employee", "admin", "cashier"] });
 
   // Orders state
   const [orders, setOrders] = useState<Order[]>([]);
@@ -21,10 +36,12 @@ export default function KitchenApp({ currentBranch }: KitchenAppProps) {
   const [ordersError, setOrdersError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("active");
   const [autoPoll, setAutoPoll] = useState(true);
+  const [activeTab, setActiveTab] = useState<"queue" | "order">("queue");
+  
   const [printedReceiptOrder, setPrintedReceiptOrder] = useState<Order | null>(null);
 
-  // Fetch kitchen orders
-  const fetchKitchenOrders = async () => {
+  // Fetch employee orders
+  const fetchEmployeeOrders = async () => {
     if (!auth.user) return;
     try {
       setIsLoadingOrders(true);
@@ -32,7 +49,7 @@ export default function KitchenApp({ currentBranch }: KitchenAppProps) {
       const result = await ApiService.getOrders(auth.user.branch_name || currentBranch);
       setOrders(result);
     } catch (err: any) {
-      setOrdersError(err.message || "Failed to load kitchen orders.");
+      setOrdersError(err.message || "Failed to load employee orders.");
     } finally {
       setIsLoadingOrders(false);
     }
@@ -41,12 +58,12 @@ export default function KitchenApp({ currentBranch }: KitchenAppProps) {
   // Poll orders
   useEffect(() => {
     if (!auth.user) return;
-    fetchKitchenOrders();
+    fetchEmployeeOrders();
 
     let pollInterval: NodeJS.Timeout;
     if (autoPoll) {
       pollInterval = setInterval(() => {
-        fetchKitchenOrders();
+        fetchEmployeeOrders();
       }, 8000);
     }
 
@@ -54,6 +71,19 @@ export default function KitchenApp({ currentBranch }: KitchenAppProps) {
       if (pollInterval) clearInterval(pollInterval);
     };
   }, [auth.user, autoPoll]);
+
+  // Auto close receipt modal after 3 seconds
+  useEffect(() => {
+    let timeout: NodeJS.Timeout;
+    if (printedReceiptOrder) {
+      timeout = setTimeout(() => {
+        setPrintedReceiptOrder(null);
+      }, 3000);
+    }
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [printedReceiptOrder]);
 
   const handleLogout = () => {
     auth.handleLogout();
@@ -63,37 +93,22 @@ export default function KitchenApp({ currentBranch }: KitchenAppProps) {
   // Progress order status
   const handleProgressStatus = async (orderId: number, currentStatus: OrderStatus) => {
     let nextStatus: OrderStatus;
-    if (currentStatus === "pending") {
-      nextStatus = "cooking";
-    } else if (currentStatus === "cooking" || currentStatus === "accepted") {
+    if (currentStatus === "cooking") {
       nextStatus = "on_table";
     } else {
       return;
     }
 
     try {
-      const orderToPrint = orders.find(o => o.id === orderId);
-      if (orderToPrint && currentStatus === "pending") {
-        setPrintedReceiptOrder({ ...orderToPrint, status: "cooking" });
-      }
-
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: nextStatus } : o));
       await ApiService.updateOrderStatus(orderId, nextStatus);
     } catch (err: any) {
       alert(`Failed to update status: ${err.message}`);
-      fetchKitchenOrders();
+      fetchEmployeeOrders();
     }
   };
 
-  // Decline an individual item
-  const handleDeclineOrderItem = async (orderId: number, itemId: number) => {
-    try {
-      const updatedOrder = await ApiService.declineOrderItem(orderId, itemId);
-      setOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
-    } catch (err: any) {
-      alert(`Failed to decline item: ${err.message}`);
-    }
-  };
+
 
   // Filter orders
   const filteredOrders = orders.filter(o => {
@@ -101,19 +116,18 @@ export default function KitchenApp({ currentBranch }: KitchenAppProps) {
     return o.status === statusFilter;
   });
 
-  const pendingCount = orders.filter(o => o.status === "pending").length;
-  const cookingCount = orders.filter(o => o.status === "cooking" || o.status === "accepted").length;
+  const cookingCount = orders.filter(o => o.status === "cooking").length;
   const onTableCount = orders.filter(o => o.status === "on_table").length;
 
   if (!auth.isAuthenticated) {
     return (
       <LoginScreen
-        title="Kitchen Console"
+        title="Employee Console"
         subtitle="Rawon TM Back-Of-House App"
         icon={<ChefHat className="w-10 h-10 text-white" />}
-        buttonText="Log In to Kitchen"
+        buttonText="Log In to Employee"
         loadingText="Authorizing..."
-        credentialHint={{ username: "kitchen", password: "kitchen123" }}
+        credentialHint={{ username: "employee", password: "employee123" }}
         username={auth.username}
         setUsername={auth.setUsername}
         password={auth.password}
@@ -127,7 +141,7 @@ export default function KitchenApp({ currentBranch }: KitchenAppProps) {
 
   return (
     <div className="bg-stone-50 text-stone-900 min-h-screen font-sans flex flex-col">
-      {/* Kitchen Header */}
+      {/* Employee Header */}
       <header className="bg-stone-900 px-6 py-4 border-b-4 border-orange-600 flex flex-col md:flex-row md:items-center justify-between gap-4 text-white">
         <div className="flex items-center gap-3">
           <div className="bg-orange-600 p-2.5 rounded-none text-white">
@@ -135,7 +149,7 @@ export default function KitchenApp({ currentBranch }: KitchenAppProps) {
           </div>
           <div>
             <h1 className="text-lg font-black tracking-tight text-white flex items-center gap-2 uppercase">
-              <span>Kitchen Display Board</span>
+              <span>Employee Display Board</span>
               <span className="text-[10px] bg-red-600 text-white px-2 py-0.5 rounded-none font-bold uppercase tracking-wider animate-pulse">Live Queue</span>
             </h1>
             <p className="text-[10px] text-stone-400 font-mono flex items-center gap-1.5 mt-0.5 uppercase">
@@ -146,6 +160,12 @@ export default function KitchenApp({ currentBranch }: KitchenAppProps) {
         </div>
 
         <div className="flex items-center gap-3 self-end md:self-auto">
+          <div className="flex items-center bg-stone-800 text-xs font-bold uppercase tracking-wider overflow-hidden">
+            <button onClick={() => setActiveTab("queue")} className={`px-4 py-2 transition-colors ${activeTab === 'queue' ? 'bg-orange-600 text-white' : 'text-stone-400 hover:text-stone-200'}`}>Live Queue</button>
+            <button onClick={() => setActiveTab("order")} className={`px-4 py-2 transition-colors ${activeTab === 'order' ? 'bg-orange-600 text-white' : 'text-stone-400 hover:text-stone-200'}`}>Order Entry</button>
+          </div>
+
+          {activeTab === 'queue' && (
           <div className="flex items-center gap-2 bg-stone-800 px-3 py-1.5 border border-stone-700 text-xs">
             <label className="text-[10px] text-stone-300 font-bold uppercase tracking-wider flex items-center gap-1 font-mono">
               <input
@@ -157,7 +177,7 @@ export default function KitchenApp({ currentBranch }: KitchenAppProps) {
               <span>Auto-refresh</span>
             </label>
             <button
-              onClick={fetchKitchenOrders}
+              onClick={fetchEmployeeOrders}
               disabled={isLoadingOrders}
               className="p-1 text-orange-500 hover:text-orange-400 disabled:text-stone-700 transition-colors"
               title="Refresh Queue"
@@ -165,6 +185,7 @@ export default function KitchenApp({ currentBranch }: KitchenAppProps) {
               <RefreshCw className={`w-3.5 h-3.5 ${isLoadingOrders ? "animate-spin" : ""}`} />
             </button>
           </div>
+          )}
 
           <button
             onClick={handleLogout}
@@ -176,14 +197,15 @@ export default function KitchenApp({ currentBranch }: KitchenAppProps) {
         </div>
       </header>
 
-      {/* Orders Filter Toolbar */}
-      <div className="bg-stone-100 px-6 py-3 border-b border-stone-200 flex gap-2 overflow-x-auto">
-        {[
-          { id: "active", label: "🔥 Active Queue", count: pendingCount + cookingCount + onTableCount },
-          { id: "pending", label: "⏳ Pending Orders", count: pendingCount },
-          { id: "cooking", label: "🍳 In Cooking", count: cookingCount },
-          { id: "on_table", label: "✅ Ready & Served", count: onTableCount }
-        ].map(filter => (
+      {activeTab === "queue" ? (
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {/* Orders Filter Toolbar */}
+          <div className="bg-stone-100 px-6 py-3 border-b border-stone-200 flex gap-2 overflow-x-auto">
+          {[
+            { id: "active", label: "ALL ACTIVE TICKETS", count: orders.filter(o => o.status !== "completed").length },
+            { id: "cooking", label: "COOKING", count: cookingCount },
+            { id: "on_table", label: "SERVED", count: onTableCount }
+          ].map(filter => (
           <button
             key={filter.id}
             onClick={() => setStatusFilter(filter.id)}
@@ -205,7 +227,7 @@ export default function KitchenApp({ currentBranch }: KitchenAppProps) {
         ))}
       </div>
 
-      {/* Grid of Kitchen Tickets */}
+      {/* Grid of Employee Tickets */}
       <div className="flex-1 p-6 overflow-y-auto">
         {ordersError && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-800 rounded-none flex items-center gap-2 text-xs font-mono max-w-lg mx-auto">
@@ -222,7 +244,7 @@ export default function KitchenApp({ currentBranch }: KitchenAppProps) {
         ) : filteredOrders.length === 0 ? (
           <div className="text-center py-24 text-stone-400 flex flex-col items-center justify-center">
             <ChefHat className="w-16 h-16 text-stone-200 mb-3" />
-            <p className="font-extrabold text-sm uppercase tracking-wider text-stone-800">Kitchen Queue is Empty</p>
+            <p className="font-extrabold text-sm uppercase tracking-wider text-stone-800">Employee Queue is Empty</p>
             <p className="text-xs mt-1 max-w-xs font-mono">No active orders found.</p>
           </div>
         ) : (
@@ -246,10 +268,10 @@ export default function KitchenApp({ currentBranch }: KitchenAppProps) {
                       <p className="text-[10px] font-bold text-stone-300 truncate max-w-[140px] uppercase mt-1 font-mono">{order.customer_name}</p>
                     </div>
                     <div className="text-right">
-                      <span className="font-mono text-[9px] text-stone-400 block">#{order.id}</span>
+                      <span className="font-mono text-[9px] text-stone-400 block">#{order.daily_order_number || order.id}</span>
                       <div className="flex items-center gap-1 mt-1 text-[10px] text-stone-300 justify-end font-mono">
                         <Clock className={`w-3.5 h-3.5 ${isUrgent ? "text-orange-500 animate-pulse" : "text-stone-400"}`} />
-                        <span className={`font-bold uppercase tracking-wider ${isUrgent ? "text-orange-400 animate-pulse" : ""}`}>{minutesElapsed}m ago</span>
+                        <span className={`font-bold uppercase tracking-wider ${isUrgent ? "text-orange-400 animate-pulse" : ""}`}>{formatTimeElapsed(minutesElapsed)}</span>
                       </div>
                     </div>
                   </div>
@@ -262,47 +284,44 @@ export default function KitchenApp({ currentBranch }: KitchenAppProps) {
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-extrabold text-stone-900 uppercase tracking-wide leading-tight mt-0.5">{it.menu_item?.name}</p>
                             {it.special_notes && (
-                              <p className="text-[10px] text-orange-950 bg-orange-50 px-2 py-0.5 border border-orange-200 font-mono inline-block mt-1 uppercase tracking-wider">⚠️ "{it.special_notes}"</p>
+                              <div className="mt-1.5 flex flex-col gap-1">
+                                {it.special_notes.split(' | ').map((note, i) => (
+                                  <p key={i} className="text-[10px] text-orange-950 bg-orange-50 px-2 py-1 border-l-2 border-orange-400 font-mono inline-block uppercase tracking-wider shadow-sm">📝 {note}</p>
+                                ))}
+                              </div>
                             )}
                           </div>
                         </div>
-                        {order.status === "pending" && it.id && (
-                          <button
-                            onClick={() => handleDeclineOrderItem(order.id, it.id!)}
-                            className="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 hover:text-red-900 text-[10px] font-bold uppercase tracking-wider transition-colors font-mono rounded-none shrink-0"
-                            title="Decline this item"
-                          >
-                            Decline
-                          </button>
-                        )}
                       </div>
                     ))}
                   </div>
 
                   <div className="p-4 bg-white border-t border-stone-200 flex items-center justify-between gap-2.5">
-                    <div className="flex flex-col">
-                      <span className="text-[9px] text-stone-400 uppercase font-bold tracking-wider">Status</span>
-                      <span className={`text-[11px] font-black uppercase tracking-wider ${
-                        order.status === "pending" ? "text-stone-900" :
-                        order.status === "accepted" ? "text-amber-600" :
-                        order.status === "cooking" ? "text-orange-600" : "text-emerald-700"
-                      }`}>
-                        {order.status === "on_table" ? "Served" : order.status}
-                      </span>
+                    <div className="flex items-center gap-4">
+                      <div className="flex flex-col">
+                        <span className="text-[9px] text-stone-400 uppercase font-bold tracking-wider">Status</span>
+                        <span className={`text-[11px] font-black uppercase tracking-wider ${
+                          order.status === "cooking" ? "text-orange-600" : "text-emerald-700"
+                        }`}>
+                          {order.status === "on_table" ? "Served" : order.status}
+                        </span>
+                      </div>
+                      
+                      <button
+                        onClick={() => setPrintedReceiptOrder(order)}
+                        className="p-1.5 rounded-none transition-all active:scale-95 bg-stone-100 border border-stone-200 text-stone-600 hover:bg-stone-200 hover:text-stone-900"
+                        title="Reprint Receipt"
+                      >
+                        <Printer className="w-4 h-4" />
+                      </button>
                     </div>
 
-                    {order.status !== "on_table" && (
+                    {order.status === "cooking" && (
                       <button
                         onClick={() => handleProgressStatus(order.id, order.status)}
-                        className={`px-3 py-2 rounded-none font-bold text-[10px] uppercase tracking-wider transition-all active:scale-95 flex items-center gap-1.5 shrink-0 ${
-                          order.status === "pending" ? "bg-stone-900 hover:bg-stone-800 text-white" :
-                          order.status === "accepted" ? "bg-amber-600 text-white hover:bg-amber-700" :
-                          "bg-orange-600 text-white hover:bg-orange-700"
-                        }`}
+                        className="px-3 py-2 rounded-none font-bold text-[10px] uppercase tracking-wider transition-all active:scale-95 flex items-center gap-1.5 shrink-0 bg-blue-600 text-white hover:bg-blue-700"
                       >
-                        {order.status === "pending" && <><Check className="w-3.5 h-3.5" /><span>Accept</span></>}
-                        {order.status === "accepted" && <><Flame className="w-3.5 h-3.5" /><span>Cook</span></>}
-                        {order.status === "cooking" && <><Check className="w-3.5 h-3.5" /><span>Done Cooking</span></>}
+                        <Check className="w-3.5 h-3.5" /><span>Mark as Served</span>
                       </button>
                     )}
 
@@ -318,6 +337,12 @@ export default function KitchenApp({ currentBranch }: KitchenAppProps) {
           </div>
         )}
       </div>
+      </div>
+      ) : (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <EmployeeOrderEntry currentBranch={auth.user!.branch_name || currentBranch} onOrderPlaced={() => setActiveTab("queue")} />
+        </div>
+      )}
 
       {/* Bluetooth Printer Receipt Modal */}
       {printedReceiptOrder && (
@@ -329,7 +354,7 @@ export default function KitchenApp({ currentBranch }: KitchenAppProps) {
             </div>
             <div className="py-4 space-y-3 text-xs leading-relaxed">
               <div className="flex justify-between font-bold">
-                <span>ORDER: #{printedReceiptOrder.id}</span>
+                <span>ORDER: #{printedReceiptOrder.daily_order_number || printedReceiptOrder.id}</span>
                 <span>TABLE: {printedReceiptOrder.table_number}</span>
               </div>
               <div className="border-b border-dashed border-stone-200 pb-2">
@@ -347,12 +372,7 @@ export default function KitchenApp({ currentBranch }: KitchenAppProps) {
             </div>
             <div className="text-center pt-4 border-t border-dashed border-stone-300">
               <p className="text-[10px] text-stone-500 uppercase tracking-wider font-bold">--- Sent to Cooking Queue ---</p>
-              <button
-                onClick={() => setPrintedReceiptOrder(null)}
-                className="mt-4 w-full py-2.5 bg-stone-900 hover:bg-stone-800 text-white rounded-none font-bold text-xs uppercase tracking-wider transition-all shadow-sm font-sans"
-              >
-                Close Receipt
-              </button>
+              <p className="text-[9px] text-stone-400 mt-2">Closing automatically...</p>
             </div>
           </div>
         </div>

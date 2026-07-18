@@ -34,24 +34,71 @@ class MenuCategoryResponse(MenuCategoryBase):
     created_at: datetime
     model_config = {"from_attributes": True}
 
+class IngredientBase(BaseModel):
+    name: str
+    stock_qty: float
+    unit: str
+    branch_name: str
+    sort_order: Optional[int] = 0
+
+class IngredientReorderItem(BaseModel):
+    id: int
+    sort_order: int
+
+class IngredientCreate(IngredientBase):
+    pass
+
+class IngredientUpdate(BaseModel):
+    name: Optional[str] = None
+    stock_qty: Optional[float] = None
+    unit: Optional[str] = None
+    branch_name: Optional[str] = None
+
+class IngredientResponse(IngredientBase):
+    id: int
+    model_config = {"from_attributes": True}
+
+class MenuItemIngredientCreate(BaseModel):
+    ingredient_id: int
+    required_qty: float
+
+class MenuItemIngredientResponse(BaseModel):
+    id: int
+    ingredient_id: int
+    required_qty: float
+    ingredient: IngredientResponse
+    model_config = {"from_attributes": True}
+
 class MenuItemBase(BaseModel):
     name: str
-    price: float
+    price_normal: float
+    price_gofood: Optional[float] = None
+    price_grabfood: Optional[float] = None
+    price_shopee: Optional[float] = None
     cost: float
-    stock_count: int
     category: str
     description: Optional[str] = None
     image_url: Optional[str] = None
     is_available: bool = True
     branch_name: str
     addons: List[str] = Field(default_factory=list)
+    sort_order: Optional[int] = 0
 
 class MenuItemCreate(MenuItemBase):
-    pass
+    ingredients: List[MenuItemIngredientCreate] = []
 
 class MenuItemResponse(MenuItemBase):
     id: int
+    stock_count: int = 0
+    ingredients: List[MenuItemIngredientResponse] = []
     model_config = {"from_attributes": True}
+
+class MenuItemReorderItem(BaseModel):
+    id: int
+    sort_order: int
+
+class MenuItemReorderRequest(BaseModel):
+    items: List[MenuItemReorderItem]
 
 class OrderItemCreate(BaseModel):
     menu_item_id: int
@@ -88,6 +135,12 @@ class OrderResponse(BaseModel):
     tax_amount: float
     branch_name: str
     created_at: datetime
+    cooked_at: Optional[datetime] = None
+    served_at: Optional[datetime] = None
+    paid_at: Optional[datetime] = None
+    daily_order_number: Optional[int] = None
+    discount_amount: float = 0.0
+    discount_reason: Optional[str] = None
     items: List[OrderItemResponse]
 
     model_config = {"from_attributes": True}
@@ -95,6 +148,8 @@ class OrderResponse(BaseModel):
 class OrderStatusUpdate(BaseModel):
     status: str
     payment_method: Optional[str] = None
+    discount_amount: Optional[float] = None
+    discount_reason: Optional[str] = None
 
 class DashboardResponse(BaseModel):
     branch_name: Optional[str] = None

@@ -63,13 +63,15 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
           setSelectedBranch(finalBranch);
         }
         
-        const [menu, cats, promos] = await Promise.all([
+        const [menu, promos] = await Promise.all([
           ApiService.getMenu(finalBranch),
-          ApiService.getCategories(),
           ApiService.getPromotions(finalBranch)
         ]);
+        
+        const uniqueCategories = Array.from(new Set(menu.map(item => item.category)));
+        
         setMenuItems(menu);
-        setCategories(cats);
+        setCategories(uniqueCategories.filter(c => c.toLowerCase() !== 'master'));
         setPromotions(promos);
         lastFetched.current = { branch: finalBranch, category: "all", search: "" };
       } catch (err: any) {
@@ -88,10 +90,15 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
       setSelectedBranch(branchName);
       setCart([]); // Clear cart when changing branch to prevent menu mixups
       const [menu, promos] = await Promise.all([
-        ApiService.getMenu(branchName, categoryFilter === "all" ? undefined : categoryFilter),
+        ApiService.getMenu(branchName),
         ApiService.getPromotions(branchName)
       ]);
+      const uniqueCategories = Array.from(new Set(menu.map(item => item.category)));
+      
       setMenuItems(menu);
+      setCategories(uniqueCategories.filter(c => c.toLowerCase() !== 'master'));
+      setCategoryFilter("all");
+      setSearchQuery("");
       setPromotions(promos);
     } catch (err: any) {
       setErrorMessage(err.message || "Failed to fetch branch menu");
@@ -134,12 +141,12 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
     return () => clearTimeout(delayDebounce);
   }, [categoryFilter, searchQuery, selectedBranch]);
 
-  // Cart operations
   const addToCart = (item: MenuItem) => {
     setActivePopupItem(item);
     setPopupNotes("");
     setPopupQuantity(1);
-    setPopupSelectedAddons([]);
+    // By default, select all available addons
+    setPopupSelectedAddons(item.addons ? [...item.addons] : []);
   };
 
   const confirmAddToCart = () => {
@@ -189,9 +196,9 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
   };
 
   // Subtotal and tax calculation
-  const subtotal = cart.reduce((sum, c) => sum + c.item.price * c.quantity, 0);
+  const subtotal = cart.reduce((sum, c) => sum + c.item.price_normal * c.quantity, 0);
   const activeBranch = branches.find(b => b.name === selectedBranch);
-  const branchTaxRate = activeBranch?.tax_rate || 0.10;
+  const branchTaxRate = activeBranch?.tax_rate ?? 0.10;
   const theme = activeBranch?.color_theme === "indigo" ? "indigo" : "stone";
   const taxAmount = Math.round(subtotal * branchTaxRate);
   const totalAmount = subtotal + taxAmount;
@@ -279,13 +286,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
         <div className="mt-3 flex items-center justify-between bg-black/40 px-3 py-2 border border-white/10 text-xs">
           <div className="flex items-center gap-1">
             <span className={`font-mono font-bold uppercase tracking-wider ${theme === 'indigo' ? 'text-emerald-400' : 'text-orange-500'}`}>Table:</span>
-            <input 
-              type="text" 
-              value={tableNumber} 
-              onChange={(e) => setTableNumber(e.target.value)} 
-              className={`w-10 bg-transparent text-white border-b font-bold focus:outline-none text-center font-mono ${theme === 'indigo' ? 'border-emerald-500/50 focus:border-emerald-400' : 'border-orange-600/50 focus:border-orange-500'}`}
-              placeholder="NO"
-            />
+            <span className="text-white font-bold font-mono ml-2 border-b-2 border-transparent">{tableNumber || "N/A"}</span>
           </div>
           <div className="text-[10px] text-white/70 font-mono uppercase tracking-wider flex items-center gap-1">
             <Sparkles className={`w-3 h-3 animate-pulse ${theme === 'indigo' ? 'text-emerald-400' : 'text-orange-500'}`} />
@@ -307,9 +308,9 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
             
             <div className="my-6 w-full bg-white p-5 rounded-none border-2 border-stone-900 text-left shadow-[4px_4px_0px_0px_rgba(0,0,0,0.9)]">
               <div className="flex justify-between items-center pb-3 border-b border-stone-200">
-                <span className="font-bold font-mono text-stone-900 text-xs">ORDER: #{placedOrder.id}</span>
+                <span className="font-bold font-mono text-stone-900 text-xs">ORDER: #{placedOrder.daily_order_number || placedOrder.id}</span>
                 <span className="px-2.5 py-1 bg-orange-100 text-orange-950 text-[10px] font-bold uppercase tracking-wider font-mono">
-                  {placedOrder.status}
+                  {placedOrder.status === "on_table" ? "Served" : placedOrder.status}
                 </span>
               </div>
               
@@ -324,7 +325,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
                 {placedOrder.items.map((it, idx) => (
                   <div key={idx} className="flex justify-between text-xs text-stone-850">
                     <span>{it.quantity}x {it.menu_item?.name}</span>
-                    <span className="font-bold font-mono">Rp {(it.menu_item?.price * it.quantity).toLocaleString("id-ID")}</span>
+                    <span className="font-bold font-mono">Rp {(it.menu_item?.price_normal * it.quantity).toLocaleString("id-ID")}</span>
                   </div>
                 ))}
               </div>
@@ -337,7 +338,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
 
             <div className="p-4 bg-orange-50 border border-orange-200 text-xs text-orange-900 flex items-start gap-2 text-left w-full mb-6 rounded-none">
               <Info className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
-              <p>Your order has been sent to the Kitchen. Please sit back; you can pay at the cashier counter later when you are done eating.</p>
+              <p>Thank you. Your order has been successfully placed</p>
             </div>
 
             <button 
@@ -487,7 +488,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
 
                       <div className="flex justify-between items-center mt-2">
                         <span className="font-bold text-xs text-stone-900 font-mono">
-                          Rp {item.price.toLocaleString("id-ID")}
+                          Rp {item.price_normal.toLocaleString("id-ID")}
                         </span>
 
                         {item.is_available && (
@@ -562,7 +563,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
                   <div className="flex justify-between items-start gap-2">
                     <div className="flex-1">
                       <h5 className="font-bold text-sm text-stone-900">{c.item.name}</h5>
-                      <p className="text-xs text-stone-500 font-mono">Rp {c.item.price.toLocaleString("id-ID")}</p>
+                      <p className="text-xs text-stone-500 font-mono">Rp {c.item.price_normal.toLocaleString("id-ID")}</p>
                       {c.selectedAddons && c.selectedAddons.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1">
                           {c.selectedAddons.map(add => (
@@ -729,7 +730,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
                 </div>
                 <div className="text-right shrink-0">
                   <p className="font-mono font-black text-lg text-stone-900">
-                    {activePopupItem.price.toLocaleString("id-ID")}
+                    {activePopupItem.price_normal.toLocaleString("id-ID")}
                   </p>
                   <p className="text-[10px] text-stone-400 font-semibold uppercase tracking-wider mt-0.5">Base price</p>
                 </div>
@@ -754,7 +755,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
                       <span>Pelengkap {activePopupItem.name.toLowerCase().includes("rawon") ? "rawon" : activePopupItem.name.split(" ")[0].toLowerCase()}</span>
                     </h4>
                     <span className="text-[9px] font-bold text-stone-500 bg-stone-100 px-2 py-0.5 uppercase tracking-wider">
-                      Optional, max 2
+                      Optional
                     </span>
                   </div>
 
@@ -768,12 +769,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
                             if (isSelected) {
                               setPopupSelectedAddons(popupSelectedAddons.filter(a => a !== addon));
                             } else {
-                              if (popupSelectedAddons.length < 2) {
-                                setPopupSelectedAddons([...popupSelectedAddons, addon]);
-                              } else {
-                                // Keep max 2 by taking the second item and appending the new one
-                                setPopupSelectedAddons([popupSelectedAddons[1], addon]);
-                              }
+                              setPopupSelectedAddons([...popupSelectedAddons, addon]);
                             }
                           }}
                           className="flex items-center justify-between py-2.5 px-1 hover:bg-stone-50/80 transition-colors cursor-pointer select-none border-b border-stone-50 last:border-0"
@@ -843,7 +839,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
                 onClick={confirmAddToCart}
                 className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs uppercase tracking-widest transition-all shadow-md active:scale-95 text-center flex items-center justify-center gap-2"
               >
-                <span>Add to Basket - Rp {(activePopupItem.price * popupQuantity).toLocaleString("id-ID")} (Incl. tax)</span>
+                <span>Add to Basket - Rp {(activePopupItem.price_normal * popupQuantity).toLocaleString("id-ID")} (Incl. tax)</span>
               </button>
             </div>
 
