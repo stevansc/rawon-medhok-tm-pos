@@ -112,7 +112,7 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
 
   // Filter orders
   const filteredOrders = orders.filter(o => {
-    if (statusFilter === "active") return o.status !== "completed";
+    if (statusFilter === "active") return o.status !== "completed" && o.status !== "discounted";
     return o.status === statusFilter;
   });
 
@@ -202,7 +202,7 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
           {/* Orders Filter Toolbar */}
           <div className="bg-stone-100 px-6 py-3 border-b border-stone-200 flex gap-2 overflow-x-auto">
           {[
-            { id: "active", label: "ALL ACTIVE TICKETS", count: orders.filter(o => o.status !== "completed").length },
+            { id: "active", label: "ALL ACTIVE TICKETS", count: orders.filter(o => o.status !== "completed" && o.status !== "discounted").length },
             { id: "cooking", label: "COOKING", count: cookingCount },
             { id: "on_table", label: "SERVED", count: onTableCount }
           ].map(filter => (
