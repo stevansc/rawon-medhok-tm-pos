@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Order } from "../types";
 import { ApiService } from "../services/api";
 import { useAuth } from "../hooks/useAuth";
@@ -7,7 +7,7 @@ import {
   Banknote, Receipt, LogOut, Search, MapPin,
   RefreshCw, ShoppingCart, Check, Printer
 } from "lucide-react";
-import { printReceipt, ReceiptData } from "../services/printer";
+import { printReceipt, printKitchenTicket, connectPrinter, isPrinterConnected, ReceiptData } from "../services/printer";
 
 interface CashierAppProps {
   currentBranch: string;
@@ -35,6 +35,9 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
   const [discountAmount, setDiscountAmount] = useState<string>("");
   const [discountReason, setDiscountReason] = useState<string>("");
 
+  const [autoPrintEnabled, setAutoPrintEnabled] = useState(false);
+  const seenOrderIds = useRef<Set<number>>(new Set());
+
   // Fetch cashier orders
   const fetchOrders = async () => {
     if (!auth.user) return;
@@ -42,6 +45,31 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
       setIsLoadingOrders(true);
       setOrdersError(null);
       const result = await ApiService.getOrders(auth.user.branch_name || currentBranch);
+
+      if (autoPrintEnabled && isPrinterConnected()) {
+        const newOrders = result.filter(o => o.status === "cooking" && !seenOrderIds.current.has(o.id));
+        for (const o of newOrders) {
+          try {
+            await printKitchenTicket({
+              branchName: o.branch_name,
+              invoiceNumber: o.daily_order_number || o.id,
+              tableNumber: o.table_number,
+              customerName: o.customer_name || "Guest",
+              orderType: o.order_type,
+              createdAt: o.created_at,
+              items: o.items.map(it => ({
+                name: it.menu_item?.name || "Unknown",
+                quantity: it.quantity,
+                notes: it.special_notes || undefined,
+              }))
+            });
+          } catch (e) {
+            console.error("Auto print failed for order", o.id, e);
+          }
+        }
+      }
+
+      result.forEach(o => seenOrderIds.current.add(o.id));
       setOrders(result);
     } catch (err: any) {
       setOrdersError(err.message || "Failed to load orders.");
@@ -144,6 +172,17 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
     return Math.max(0, paid - finalTotal);
   };
 
+  const handleConnectPrinter = async () => {
+    try {
+      await connectPrinter();
+      setAutoPrintEnabled(true);
+      alert("Printer connected! Auto-print is now active for new incoming orders.");
+    } catch (err: any) {
+      alert(`Failed to connect printer: ${err.message}`);
+      setAutoPrintEnabled(false);
+    }
+  };
+
   const handleBluetoothPrint = async (order: Order) => {
     try {
       const receiptData: ReceiptData = {
@@ -217,6 +256,14 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
           </div>
 
           <div className="flex items-center gap-2.5">
+            <button
+              onClick={handleConnectPrinter}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-none text-xs font-bold uppercase tracking-wider transition-all border border-stone-700 ${autoPrintEnabled ? "bg-emerald-600 text-white hover:bg-emerald-700" : "bg-stone-800 text-stone-300 hover:bg-stone-700"}`}
+              title="Connect Auto-Printer"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{autoPrintEnabled ? "Auto-Print ON" : "Connect Printer"}</span>
+            </button>
             <button
               onClick={fetchOrders}
               disabled={isLoadingOrders}

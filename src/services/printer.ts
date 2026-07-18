@@ -274,3 +274,70 @@ export async function printReceipt(data: ReceiptData): Promise<void> {
   const bytes = buildReceiptBytes(data);
   await printBytes(connection, bytes);
 }
+
+export interface KitchenTicketData {
+  branchName: string;
+  invoiceNumber: string | number;
+  tableNumber: number;
+  customerName: string;
+  orderType: string;
+  createdAt: string;
+  items: Array<{
+    name: string;
+    quantity: number;
+    notes?: string;
+  }>;
+}
+
+export function buildKitchenTicketBytes(data: KitchenTicketData): Uint8Array {
+  const W = 32;
+  return concat(
+    buildInit(),
+    buildAlign("center"),
+    buildBold(true),
+    buildSize(0x11), // Double height/width
+    encode(`TABLE ${data.tableNumber}\n`),
+    buildSize(0x00),
+    encode(`TYPE: ${data.orderType.toUpperCase()}\n`),
+    buildBold(false),
+    buildSeparator(W),
+    
+    buildAlign("left"),
+    encode(formatLine("ORDER", "#" + data.invoiceNumber, W) + "\n"),
+    encode(formatLine("CUST", data.customerName.toUpperCase(), W) + "\n"),
+    encode(formatLine("TIME", new Date(data.createdAt).toLocaleTimeString(), W) + "\n"),
+    buildSeparator(W),
+    
+    // Items
+    ...data.items.flatMap(item => {
+      const lines = [
+        buildBold(true),
+        buildSize(0x01), // Double width
+        encode(`${item.quantity}x ${item.name.toUpperCase()}\n`),
+        buildSize(0x00),
+        buildBold(false),
+      ];
+      if (item.notes) {
+        lines.push(encode(`   Note: ${item.notes}\n`));
+      }
+      return lines;
+    }),
+    buildSeparator(W),
+    
+    buildAlign("center"),
+    encode("-- END OF TICKET --\n"),
+    
+    buildFeed(4),
+    buildCut()
+  );
+}
+
+export async function printKitchenTicket(data: KitchenTicketData): Promise<void> {
+  const connection = await connectPrinter();
+  const bytes = buildKitchenTicketBytes(data);
+  await printBytes(connection, bytes);
+}
+
+export function isPrinterConnected(): boolean {
+  return !!(cachedConnection && cachedConnection.device.gatt?.connected);
+}

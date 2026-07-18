@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Order, OrderStatus } from "../types";
 import { ApiService } from "../services/api";
 import { useAuth } from "../hooks/useAuth";
@@ -8,6 +8,7 @@ import {
   Flame, Check, ChefHat, LogOut, Clock,
   MapPin, RefreshCw, AlertCircle, Printer
 } from "lucide-react";
+import { printKitchenTicket, connectPrinter, isPrinterConnected } from "../services/printer";
 
 interface EmployeeAppProps {
   currentBranch: string;
@@ -37,6 +38,8 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
   const [statusFilter, setStatusFilter] = useState<string>("active");
   const [autoPoll, setAutoPoll] = useState(true);
   const [activeTab, setActiveTab] = useState<"queue" | "order">("queue");
+  const [autoPrintEnabled, setAutoPrintEnabled] = useState(false);
+  const seenOrderIds = useRef<Set<number>>(new Set());
   
   const [printedReceiptOrder, setPrintedReceiptOrder] = useState<Order | null>(null);
 
@@ -47,6 +50,31 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
       setIsLoadingOrders(true);
       setOrdersError(null);
       const result = await ApiService.getOrders(auth.user.branch_name || currentBranch);
+      
+      if (autoPrintEnabled && isPrinterConnected()) {
+        const newOrders = result.filter(o => o.status === "cooking" && !seenOrderIds.current.has(o.id));
+        for (const o of newOrders) {
+          try {
+            await printKitchenTicket({
+              branchName: o.branch_name,
+              invoiceNumber: o.daily_order_number || o.id,
+              tableNumber: o.table_number,
+              customerName: o.customer_name || "Guest",
+              orderType: o.order_type,
+              createdAt: o.created_at,
+              items: o.items.map(it => ({
+                name: it.menu_item?.name || "Unknown",
+                quantity: it.quantity,
+                notes: it.special_notes || undefined,
+              }))
+            });
+          } catch (e) {
+            console.error("Auto print failed for order", o.id, e);
+          }
+        }
+      }
+      
+      result.forEach(o => seenOrderIds.current.add(o.id));
       setOrders(result);
     } catch (err: any) {
       setOrdersError(err.message || "Failed to load employee orders.");
@@ -109,6 +137,16 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
   };
 
 
+  const handleConnectPrinter = async () => {
+    try {
+      await connectPrinter();
+      setAutoPrintEnabled(true);
+      alert("Printer connected! Auto-print is now active for new incoming orders.");
+    } catch (err: any) {
+      alert(`Failed to connect printer: ${err.message}`);
+      setAutoPrintEnabled(false);
+    }
+  };
 
   // Filter orders
   const filteredOrders = orders.filter(o => {
@@ -164,6 +202,15 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
             <button onClick={() => setActiveTab("queue")} className={`px-4 py-2 transition-colors ${activeTab === 'queue' ? 'bg-orange-600 text-white' : 'text-stone-400 hover:text-stone-200'}`}>Live Queue</button>
             <button onClick={() => setActiveTab("order")} className={`px-4 py-2 transition-colors ${activeTab === 'order' ? 'bg-orange-600 text-white' : 'text-stone-400 hover:text-stone-200'}`}>Order Entry</button>
           </div>
+
+          <button
+            onClick={handleConnectPrinter}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-none text-xs font-bold uppercase tracking-wider transition-all ${autoPrintEnabled ? "bg-emerald-600 text-white hover:bg-emerald-700" : "bg-stone-700 text-stone-300 hover:bg-stone-600"}`}
+            title="Connect Auto-Printer"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">{autoPrintEnabled ? "Auto-Print ON" : "Connect Printer"}</span>
+          </button>
 
           {activeTab === 'queue' && (
           <div className="flex items-center gap-2 bg-stone-800 px-3 py-1.5 border border-stone-700 text-xs">
