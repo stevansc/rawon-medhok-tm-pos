@@ -145,6 +145,41 @@ class OrderResponse(BaseModel):
 
     model_config = {"from_attributes": True}
 
+class MenuItemResponseLite(MenuItemBase):
+    id: int
+    stock_count: Optional[int] = None
+    model_config = {"from_attributes": True}
+
+class OrderItemResponseLite(BaseModel):
+    id: int
+    menu_item_id: int
+    quantity: int
+    special_notes: Optional[str]
+    status: str
+    menu_item: MenuItemResponseLite
+    model_config = {"from_attributes": True}
+
+class OrderResponseLite(BaseModel):
+    id: int
+    table_number: int
+    customer_name: Optional[str]
+    phone_number: Optional[str]
+    order_type: str
+    payment_method: Optional[str]
+    status: str
+    total_amount: float
+    tax_amount: float
+    branch_name: str
+    created_at: datetime
+    cooked_at: Optional[datetime] = None
+    served_at: Optional[datetime] = None
+    paid_at: Optional[datetime] = None
+    daily_order_number: Optional[int] = None
+    discount_amount: float = 0.0
+    discount_reason: Optional[str] = None
+    items: List[OrderItemResponseLite]
+    model_config = {"from_attributes": True}
+
 class OrderStatusUpdate(BaseModel):
     status: str
     payment_method: Optional[str] = None

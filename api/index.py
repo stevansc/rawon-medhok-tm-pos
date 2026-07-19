@@ -375,10 +375,13 @@ def get_orders(
     if status:
         query = query.filter(models.Order.status == status)
     
-    # PERFORMANCE FIX: Only fetch orders from today.
+    # PERFORMANCE FIX: Only fetch orders from today (GMT+7 midnight).
     # Admin dashboard uses /admin/transactions for historical data.
-    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    query = query.filter(models.Order.created_at >= today)
+    now = datetime.utcnow()
+    local_now = now + timedelta(hours=7)
+    local_midnight = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    utc_midnight_gmt7 = local_midnight - timedelta(hours=7)
+    query = query.filter(models.Order.created_at >= utc_midnight_gmt7)
 
     return query.all()
 
@@ -450,7 +453,7 @@ def update_order_status(
     return db_order
 
 # --- ADMIN DASHBOARD ---
-@app.get("/api/admin/transactions", response_model=List[schemas.OrderResponse])
+@app.get("/api/admin/transactions", response_model=List[schemas.OrderResponseLite])
 def get_transactions(
     branch_name: Optional[str] = None,
     start_date: Optional[str] = None,
