@@ -45,7 +45,7 @@ export default function LoginScreen({
 
       <div className="bg-stone-950 rounded-none p-6 shadow-2xl border-2 border-orange-600">
         <h3 className="font-bold text-sm text-white mb-4 flex items-center gap-2 uppercase tracking-wider">
-          <span>Staff Authentication Required</span>
+          <span>Autentikasi Staf Diperlukan</span>
         </h3>
 
         <form onSubmit={handleLogin} className="space-y-4 text-sm">
@@ -54,7 +54,7 @@ export default function LoginScreen({
             <input
               type="text"
               required
-              placeholder="Enter username"
+              placeholder="Masukkan username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="w-full bg-stone-900 border border-stone-800 rounded-none px-4 py-3 text-white focus:outline-none focus:border-orange-500 text-xs placeholder-stone-600 font-mono"
@@ -62,11 +62,11 @@ export default function LoginScreen({
           </div>
 
           <div>
-            <label className="block text-[10px] font-bold text-stone-300 uppercase tracking-wider mb-1">Password</label>
+            <label className="block text-[10px] font-bold text-stone-300 uppercase tracking-wider mb-1">Kata Sandi</label>
             <input
               type="password"
               required
-              placeholder="Enter password"
+              placeholder="Masukkan kata sandi"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-stone-900 border border-stone-800 rounded-none px-4 py-3 text-white focus:outline-none focus:border-orange-500 text-xs placeholder-stone-600 font-mono"

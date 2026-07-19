@@ -77,7 +77,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
         setPromotions(promos);
         lastFetched.current = { branch: finalBranch, category: "all", search: "" };
       } catch (err: any) {
-        setErrorMessage(err.message || "Failed to load initial data.");
+        setErrorMessage(err.message || "Gagal memuat data awal.");
       } finally {
         setIsLoading(false);
       }
@@ -103,7 +103,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
       setSearchQuery("");
       setPromotions(promos);
     } catch (err: any) {
-      setErrorMessage(err.message || "Failed to fetch branch menu");
+      setErrorMessage(err.message || "Gagal memuat menu cabang");
     } finally {
       setIsLoading(false);
     }
@@ -130,7 +130,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
         );
         setMenuItems(menu);
       } catch (err: any) {
-        setErrorMessage(err.message || "Failed to search/filter menu.");
+        setErrorMessage(err.message || "Gagal mencari/memfilter menu.");
       } finally {
         setIsLoading(false);
       }
@@ -210,15 +210,15 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customerName.trim()) {
-      alert("Please enter your name.");
+      alert("Silakan masukkan nama Anda.");
       return;
     }
     if (!tableNumber) {
-      alert("Please enter your table number.");
+      alert("Silakan masukkan nomor meja Anda.");
       return;
     }
     if (cart.length === 0) {
-      alert("Your cart is empty!");
+      alert("Keranjang Anda kosong!");
       return;
     }
 
@@ -248,7 +248,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
       setCart([]); // Clear cart
       setIsCartOpen(false);
     } catch (err: any) {
-      setErrorMessage(err.message || "Failed to place order. Please try again.");
+      setErrorMessage(err.message || "Gagal membuat pesanan. Silakan coba lagi.");
     } finally {
       setIsSubmittingOrder(false);
     }
@@ -274,7 +274,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
             </div>
             <div>
               <h1 className="font-extrabold text-sm uppercase tracking-widest leading-none">Rawon TM</h1>
-              <p className={`text-[9px] font-mono mt-0.5 ${theme === 'indigo' ? 'text-indigo-200' : 'text-stone-400'}`}>DINE-IN CUSTOMER APP</p>
+              <p className={`text-[9px] font-mono mt-0.5 ${theme === 'indigo' ? 'text-indigo-200' : 'text-stone-400'}`}>APLIKASI PELANGGAN MAKAN DI TEMPAT</p>
             </div>
           </div>
 
@@ -287,12 +287,12 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
         {/* QR info details / mock table info */}
         <div className="mt-3 flex items-center justify-between bg-black/40 px-3 py-2 border border-white/10 text-xs">
           <div className="flex items-center gap-1">
-            <span className={`font-mono font-bold uppercase tracking-wider ${theme === 'indigo' ? 'text-emerald-400' : 'text-orange-500'}`}>Table:</span>
+            <span className={`font-mono font-bold uppercase tracking-wider ${theme === 'indigo' ? 'text-emerald-400' : 'text-orange-500'}`}>Meja:</span>
             <span className="text-white font-bold font-mono ml-2 border-b-2 border-transparent">{tableNumber || "N/A"}</span>
           </div>
           <div className="text-[10px] text-white/70 font-mono uppercase tracking-wider flex items-center gap-1">
             <Sparkles className={`w-3 h-3 animate-pulse ${theme === 'indigo' ? 'text-emerald-400' : 'text-orange-500'}`} />
-            <span>Active Session</span>
+            <span>Sesi Aktif</span>
           </div>
         </div>
       </header>
@@ -306,21 +306,21 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
               <CheckCircle className="w-12 h-12 text-orange-600 animate-bounce" />
             </div>
             <h2 className="text-2xl font-black text-stone-900 uppercase tracking-wide">Matur Nuwun!</h2>
-            <p className="text-stone-500 text-sm mt-1">Your order has been submitted successfully.</p>
+            <p className="text-stone-500 text-sm mt-1">Pesanan Anda telah berhasil dibuat.</p>
             
             <div className="my-6 w-full bg-white p-5 rounded-none border-2 border-stone-900 text-left shadow-[4px_4px_0px_0px_rgba(0,0,0,0.9)]">
               <div className="flex justify-between items-center pb-3 border-b border-stone-200">
-                <span className="font-bold font-mono text-stone-900 text-xs">ORDER: #{placedOrder.daily_order_number || placedOrder.id}</span>
+                <span className="font-bold font-mono text-stone-900 text-xs">PESANAN: #{placedOrder.daily_order_number || placedOrder.id}</span>
                 <span className="px-2.5 py-1 bg-orange-100 text-orange-950 text-[10px] font-bold uppercase tracking-wider font-mono">
-                  {placedOrder.status === "on_table" ? "Served" : placedOrder.status}
+                  {placedOrder.status === "on_table" ? "Disajikan" : placedOrder.status}
                 </span>
               </div>
               
               <div className="space-y-2 py-3 text-xs text-stone-600 font-mono">
-                <p><span className="font-bold text-stone-900">CUSTOMER:</span> {placedOrder.customer_name}</p>
-                <p><span className="font-bold text-stone-900">TABLE NO:</span> {placedOrder.table_number}</p>
-                <p><span className="font-bold text-stone-900">BRANCH:</span> {placedOrder.branch_name}</p>
-                <p><span className="font-bold text-stone-900">TIME:</span> {formatTimeGMT7(placedOrder.created_at)}</p>
+                <p><span className="font-bold text-stone-900">PELANGGAN:</span> {placedOrder.customer_name}</p>
+                <p><span className="font-bold text-stone-900">NO MEJA:</span> {placedOrder.table_number}</p>
+                <p><span className="font-bold text-stone-900">CABANG:</span> {placedOrder.branch_name}</p>
+                <p><span className="font-bold text-stone-900">WAKTU:</span> {formatTimeGMT7(placedOrder.created_at)}</p>
               </div>
 
               <div className="border-t border-stone-200 pt-3 space-y-1">
@@ -333,21 +333,21 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
               </div>
 
               <div className="border-t-2 border-dashed border-stone-300 mt-3 pt-3 flex justify-between font-bold text-sm text-stone-900 font-mono">
-                <span>TOTAL (INCL. TAX)</span>
-                <span>Rp {placedOrder.total_amount.toLocaleString("id-ID")}</span>
+                <span>TOTAL (TERMASUK PAJAK)</span>
+                <span>Rp {Number(placedOrder.total_amount).toLocaleString("id-ID")}</span>
               </div>
             </div>
 
             <div className="p-4 bg-orange-50 border border-orange-200 text-xs text-orange-900 flex items-start gap-2 text-left w-full mb-6 rounded-none">
               <Info className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
-              <p>Thank you. Your order has been successfully placed</p>
+              <p>Terima kasih. Pesanan Anda telah berhasil dibuat</p>
             </div>
 
             <button 
               onClick={startNewOrder}
               className="w-full py-3.5 bg-orange-600 hover:bg-orange-700 text-white rounded-none font-bold uppercase tracking-wider text-xs transition-all active:scale-[0.98] shadow-md"
             >
-              Order Something Else
+              Pesan Sesuatu yang Lain
             </button>
           </div>
         ) : (
@@ -372,7 +372,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
             {/* Branch Fallback Selector if not set in query */}
             {!branchNameQuery && branches.length > 0 && (
               <div className="p-4 bg-stone-100 border-b border-stone-200 flex items-center justify-between">
-                <span className="text-xs font-bold text-stone-900 uppercase tracking-wider">Branch:</span>
+                <span className="text-xs font-bold text-stone-900 uppercase tracking-wider">Cabang:</span>
                 <select 
                   value={selectedBranch}
                   onChange={(e) => handleBranchChange(e.target.value)}
@@ -390,7 +390,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
               <div className="relative">
                 <input 
                   type="text"
-                  placeholder="Search rawon, drinks, sides..."
+                  placeholder="Cari rawon, minuman, pendamping..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full bg-white border border-stone-300 pl-10 pr-4 py-3 rounded-none text-xs focus:outline-none focus:border-orange-600 focus:ring-1 focus:ring-orange-600 shadow-sm placeholder-stone-400 font-mono transition-all"
@@ -409,7 +409,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
                     : "bg-stone-200 text-stone-600 hover:bg-stone-300"
                 }`}
               >
-                🍲 ALL ITEMS
+                🍲 SEMUA MENU
               </button>
               {categories.map(cat => (
                 <button
@@ -450,8 +450,8 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
                 </div>
               ) : menuItems.length === 0 ? (
                 <div className="text-center py-12 text-stone-500">
-                  <p className="font-bold text-sm">No dishes found</p>
-                  <p className="text-xs mt-1 font-mono">Try another category or search filter.</p>
+                  <p className="font-bold text-sm">Tidak ada menu ditemukan</p>
+                  <p className="text-xs mt-1 font-mono">Coba kategori lain atau filter pencarian.</p>
                 </div>
               ) : (
                 menuItems.map(item => (
@@ -472,7 +472,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
                       />
                       {(!item.is_available || item.stock_count === 0) && (
                         <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-[10px] text-white font-extrabold uppercase tracking-widest">
-                          Sold Out
+                          Habis
                         </div>
                       )}
                     </div>
@@ -490,7 +490,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
 
                       <div className="flex justify-between items-center mt-2">
                         <span className="font-bold text-xs text-stone-900 font-mono">
-                          Rp {item.price_normal.toLocaleString("id-ID")}
+                          Rp {Number(item.price_normal).toLocaleString("id-ID")}
                         </span>
 
                         {item.is_available && item.stock_count !== 0 && (
@@ -499,7 +499,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
                             className="bg-orange-600 text-white py-1 px-3 hover:bg-orange-700 active:scale-95 transition-all flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-wider"
                           >
                             <Plus className="w-3 h-3" />
-                            <span>Add</span>
+                            <span>Tambah</span>
                           </button>
                         )}
                       </div>
@@ -529,15 +529,15 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
               </span>
             </div>
             <div>
-              <p className="text-[10px] text-stone-400 font-mono">ESTIMATED TOTAL</p>
-              <p className="text-xs font-bold font-mono text-white">Rp {totalAmount.toLocaleString("id-ID")}</p>
+              <p className="text-[10px] text-stone-400 font-mono">ESTIMASI TOTAL</p>
+              <p className="text-xs font-bold font-mono text-white">Rp {Number(totalAmount).toLocaleString("id-ID")}</p>
             </div>
           </div>
 
           <div
             className="px-4 py-2.5 bg-orange-600 text-white font-bold text-[10px] uppercase tracking-wider shadow-md transition-all"
           >
-            Review Basket
+            Tinjau Pesanan
           </div>
         </div>
       )}
@@ -558,14 +558,14 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
               <div className="flex justify-between items-center">
                 <h3 className="font-extrabold text-md text-stone-900 flex items-center gap-2 uppercase tracking-wide">
                   <ShoppingBag className="w-5 h-5 text-orange-600" />
-                  <span>Your Basket</span>
+                  <span>Pesanan Anda</span>
                 </h3>
                 <button 
                   type="button"
                   onClick={() => setIsCartOpen(false)}
                   className="text-[10px] font-bold text-stone-500 hover:text-stone-900 bg-stone-100 px-3 py-1.5 uppercase tracking-wider font-mono"
                 >
-                  Close
+                  Tutup
                 </button>
               </div>
             </div>
@@ -579,7 +579,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
                     <div className="flex justify-between items-start gap-2">
                       <div className="flex-1">
                         <h5 className="font-bold text-sm text-stone-900">{c.item.name}</h5>
-                        <p className="text-xs text-stone-500 font-mono">Rp {c.item.price_normal.toLocaleString("id-ID")}</p>
+                        <p className="text-xs text-stone-500 font-mono">Rp {Number(c.item.price_normal).toLocaleString("id-ID")}</p>
                         {c.selectedAddons && c.selectedAddons.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1">
                             {c.selectedAddons.map(add => (
@@ -615,7 +615,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
                       <FileText className="w-3 h-3 text-stone-400 shrink-0" />
                       <input 
                         type="text" 
-                        placeholder="Add special notes (e.g. no onions, extra spicy)..."
+                        placeholder="Tambah catatan (mis. tanpa bawang, ekstra pedas)..."
                         value={c.notes}
                         onChange={(e) => updateCartNotes(c.id, e.target.value)}
                         className="w-full text-xs text-stone-600 bg-stone-50 border-b border-transparent focus:border-orange-600 focus:outline-none py-1 font-mono"
@@ -627,25 +627,25 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
 
               {/* Customer Details Form */}
               <div className="border-t border-stone-200 pt-4 space-y-3">
-                <h4 className="font-black text-xs text-stone-900 uppercase tracking-wider mb-2">Customer Details</h4>
+                <h4 className="font-black text-xs text-stone-900 uppercase tracking-wider mb-2">Detail Pelanggan</h4>
                 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1">Your Name</label>
+                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1">Nama Anda</label>
                     <input 
                       type="text" 
                       required
-                      placeholder="Enter name"
+                      placeholder="Masukkan nama"
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
                       className="w-full text-xs bg-stone-50 border border-stone-300 p-2.5 focus:outline-none focus:border-orange-600 rounded-none font-mono"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1">Phone Number</label>
+                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1">Nomor Telepon</label>
                     <input 
                       type="tel" 
-                      placeholder="e.g. 081234..."
+                      placeholder="mis. 081234..."
                       value={phoneNumber}
                       onChange={(e) => setPhoneNumber(e.target.value)}
                       className="w-full text-xs bg-stone-50 border border-stone-300 p-2.5 focus:outline-none focus:border-orange-600 rounded-none font-mono"
@@ -654,14 +654,14 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1">Dining Option</label>
+                  <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1">Pilihan Bersantap</label>
                   <select 
                     value={orderType}
                     onChange={(e) => setOrderType(e.target.value as "dine-in" | "take-away")}
                     className="w-full text-xs bg-stone-50 border border-stone-300 p-2.5 focus:outline-none focus:border-orange-600 rounded-none font-mono font-bold"
                   >
-                    <option value="dine-in">🍽️ Dine-in</option>
-                    <option value="take-away">🛍️ Takeaway</option>
+                    <option value="dine-in">🍽️ Makan di Tempat</option>
+                    <option value="take-away">🛍️ Bawa Pulang</option>
                   </select>
                 </div>
 
@@ -669,15 +669,15 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
                 <div className="bg-stone-100 p-4 mt-4 space-y-2 text-xs border border-stone-200">
                   <div className="flex justify-between text-stone-600">
                     <span>Subtotal</span>
-                    <span className="font-mono">Rp {subtotal.toLocaleString("id-ID")}</span>
+                    <span className="font-mono">Rp {Number(subtotal).toLocaleString("id-ID")}</span>
                   </div>
                   <div className="flex justify-between text-stone-600">
-                    <span>Tax ({Math.round(branchTaxRate * 100)}%)</span>
-                    <span className="font-mono">Rp {taxAmount.toLocaleString("id-ID")}</span>
+                    <span>Pajak ({Math.round(branchTaxRate * 100)}%)</span>
+                    <span className="font-mono">Rp {Number(taxAmount).toLocaleString("id-ID")}</span>
                   </div>
                   <div className="flex justify-between font-black text-sm text-stone-900 border-t border-dashed border-stone-300 pt-2 mt-2">
-                    <span>Total Amount</span>
-                    <span className="font-mono text-orange-600">Rp {totalAmount.toLocaleString("id-ID")}</span>
+                    <span>Total Harga</span>
+                    <span className="font-mono text-orange-600">Rp {Number(totalAmount).toLocaleString("id-ID")}</span>
                   </div>
                 </div>
 
@@ -696,7 +696,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
                 disabled={isSubmittingOrder}
                 className="w-full py-3.5 bg-orange-600 hover:bg-orange-700 disabled:bg-stone-300 disabled:text-stone-500 text-white font-bold text-sm uppercase tracking-wider rounded-none shadow-md active:scale-[0.98] transition-all"
               >
-                {isSubmittingOrder ? "Placing Order..." : `Send Order • Rp ${totalAmount.toLocaleString("id-ID")}`}
+                {isSubmittingOrder ? "Membuat Pesanan..." : `Kirim Pesanan • Rp ${Number(totalAmount).toLocaleString("id-ID")}`}
               </button>
             </div>
           </form>
@@ -729,7 +729,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
                 type="button"
                 onClick={() => setActivePopupItem(null)}
                 className="absolute top-4 left-4 bg-black/40 hover:bg-black/60 text-white rounded-full p-2.5 flex items-center justify-center transition-all shadow-md"
-                title="Close"
+                title="Tutup"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -748,9 +748,9 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
                 </div>
                 <div className="text-right shrink-0">
                   <p className="font-mono font-black text-lg text-stone-900">
-                    {activePopupItem.price_normal.toLocaleString("id-ID")}
+                    {Number(activePopupItem.price_normal).toLocaleString("id-ID")}
                   </p>
-                  <p className="text-[10px] text-stone-400 font-semibold uppercase tracking-wider mt-0.5">Base price</p>
+                  <p className="text-[10px] text-stone-400 font-semibold uppercase tracking-wider mt-0.5">Harga dasar</p>
                 </div>
               </div>
               
@@ -773,7 +773,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
                       <span>Pelengkap {activePopupItem.name.toLowerCase().includes("rawon") ? "rawon" : activePopupItem.name.split(" ")[0].toLowerCase()}</span>
                     </h4>
                     <span className="text-[9px] font-bold text-stone-500 bg-stone-100 px-2 py-0.5 uppercase tracking-wider">
-                      Optional
+                      Opsional
                     </span>
                   </div>
 
@@ -811,13 +811,13 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
               <div className="bg-white p-4 border border-stone-200 shadow-xs">
                 <div className="flex justify-between items-center mb-2">
                   <h4 className="font-extrabold text-xs text-stone-900 uppercase tracking-wider">
-                    Note to restaurant
+                    Catatan untuk restoran
                   </h4>
-                  <span className="text-[9px] text-stone-400 font-bold uppercase">Optional</span>
+                  <span className="text-[9px] text-stone-400 font-bold uppercase">Opsional</span>
                 </div>
                 <textarea 
                   rows={2}
-                  placeholder="Add your request (subject to restaurant's discretion)..."
+                  placeholder="Tambahkan permintaan Anda (tergantung pada kebijakan restoran)..."
                   value={popupNotes}
                   onChange={(e) => setPopupNotes(e.target.value)}
                   className="w-full text-xs text-stone-800 bg-stone-50 border border-stone-300 rounded-none p-2.5 focus:border-emerald-600 focus:outline-none focus:ring-0 font-mono placeholder-stone-400"
@@ -831,7 +831,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
               
               {/* Quantity selector inside bar */}
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 font-mono">Select Quantity</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 font-mono">Pilih Kuantitas</span>
                 <div className="flex items-center gap-2.5 bg-stone-100 p-1 rounded-none border border-stone-200">
                   <button 
                     type="button"
@@ -857,7 +857,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
                 onClick={confirmAddToCart}
                 className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs uppercase tracking-widest transition-all shadow-md active:scale-95 text-center flex items-center justify-center gap-2"
               >
-                <span>Add to Basket - Rp {(activePopupItem.price_normal * popupQuantity).toLocaleString("id-ID")} (Incl. tax)</span>
+                <span>Tambah ke Keranjang - Rp {(activePopupItem.price_normal * popupQuantity).toLocaleString("id-ID")} (Termasuk pajak)</span>
               </button>
             </div>
           </div>

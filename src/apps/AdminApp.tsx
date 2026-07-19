@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { MenuItem, Branch, DashboardAnalytics } from "../types";
 import { FALLBACK_IMAGE_URL } from "../types";
 import { ApiService } from "../services/api";
+import { formatTimeGMT7 } from "../utils/time";
 import { useAuth } from "../hooks/useAuth";
 import LoginScreen from "../components/LoginScreen";
 import { Modal } from "../components/Modal";
@@ -76,7 +77,7 @@ function SortableMenuItem({ item, onToggleAvailability, onEdit, onDelete, branch
               <span className={`text-[9px] border px-1.5 py-0.5 rounded-none font-bold uppercase ${itemStock < 5 ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-stone-100 text-stone-700 border-stone-300"}`}>Stock: {itemStock}</span>
             )}
             <span className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded-none font-mono">
-              Cost: Rp {itemCost.toLocaleString("id-ID")}
+              Cost: Rp {Number(itemCost).toLocaleString("id-ID")}
             </span>
           </div>
         </div>
@@ -85,24 +86,24 @@ function SortableMenuItem({ item, onToggleAvailability, onEdit, onDelete, branch
         <div className="flex flex-col items-end gap-1 font-mono">
           <div className="flex items-center gap-2">
             <span className="text-[9px] text-stone-500 uppercase font-bold tracking-widest">Dine-in</span>
-            <span className="font-bold text-xs text-orange-600">Rp {item.price_normal.toLocaleString("id-ID")}</span>
+            <span className="font-bold text-xs text-orange-600">Rp {Number(item.price_normal).toLocaleString("id-ID")}</span>
           </div>
           {!!item.price_gofood && (
             <div className="flex items-center gap-2">
               <span className="text-[9px] text-red-500/80 uppercase font-bold tracking-widest">GoFood</span>
-              <span className="font-bold text-[11px] text-stone-600">Rp {item.price_gofood.toLocaleString("id-ID")}</span>
+              <span className="font-bold text-[11px] text-stone-600">Rp {Number(item.price_gofood).toLocaleString("id-ID")}</span>
             </div>
           )}
           {!!item.price_grabfood && (
             <div className="flex items-center gap-2">
               <span className="text-[9px] text-emerald-500/80 uppercase font-bold tracking-widest">Grab</span>
-              <span className="font-bold text-[11px] text-stone-600">Rp {item.price_grabfood.toLocaleString("id-ID")}</span>
+              <span className="font-bold text-[11px] text-stone-600">Rp {Number(item.price_grabfood).toLocaleString("id-ID")}</span>
             </div>
           )}
           {!!item.price_shopee && (
             <div className="flex items-center gap-2">
               <span className="text-[9px] text-orange-400/80 uppercase font-bold tracking-widest">Shopee</span>
-              <span className="font-bold text-[11px] text-stone-600">Rp {item.price_shopee.toLocaleString("id-ID")}</span>
+              <span className="font-bold text-[11px] text-stone-600">Rp {Number(item.price_shopee).toLocaleString("id-ID")}</span>
             </div>
           )}
         </div>
@@ -192,9 +193,7 @@ export default function AdminApp() {
   };
 
   const formatLocalTime = (isoString?: string) => {
-    if (!isoString) return "-";
-    const d = new Date(isoString + (!isoString.endsWith('Z') ? 'Z' : ''));
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' });
+    return formatTimeGMT7(isoString);
   };
 
   // Active section tab
@@ -815,7 +814,7 @@ export default function AdminApp() {
               onChange={(e) => setSelectedBranchFilter(e.target.value)}
               className="bg-transparent text-white focus:outline-none border-0 p-0 font-bold hover:text-orange-500 transition-colors cursor-pointer text-xs"
             >
-              <option value="" className="bg-stone-900 text-white">All Branches Combined</option>
+              <option value="" className="bg-stone-900 text-white">Semua Cabang Gabungan</option>
               {branches.map(b => (
                 <option key={b.name} value={b.name} className="bg-stone-900 text-white">{b.name}</option>
               ))}
@@ -827,7 +826,7 @@ export default function AdminApp() {
             className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-none text-xs font-bold uppercase tracking-wider transition-all"
           >
             <LogOut className="w-3.5 h-3.5" />
-            <span>Sign Out</span>
+            <span>Keluar</span>
           </button>
         </div>
       </header>
@@ -835,11 +834,11 @@ export default function AdminApp() {
       {/* Tabs navigation */}
       <div className="bg-stone-900 px-6 border-b border-stone-850 flex gap-4 shrink-0 text-white overflow-x-auto scrollbar-hide">
         {[
-          { id: "dashboard", label: "📈 Dashboard Analytics" },
-          { id: "transactions", label: "🧾 Transactions Detail" },
-          { id: "branches", label: "🏬 Branch Settings" },
-          { id: "menu", label: "🍳 Dish Menu Editor" },
-          { id: "inventory", label: "📦 Inventory Management" }
+          { id: "dashboard", label: "📈 Analitik Dasbor" },
+          { id: "transactions", label: "🧾 Detail Transaksi" },
+          { id: "branches", label: "🏬 Pengaturan Cabang" },
+          { id: "menu", label: "🍳 Editor Menu Hidangan" },
+          { id: "inventory", label: "📦 Manajemen Inventaris" }
         ].map(tab => (
           <button
             key={tab.id}
@@ -862,7 +861,7 @@ export default function AdminApp() {
       <div className="flex-1 p-6 overflow-y-auto">
         {isLoading && (
           <div className="text-center py-12 text-stone-500 font-mono">
-            <p className="animate-pulse text-xs uppercase tracking-widest font-extrabold text-orange-600">Loading enterprise data...</p>
+            <p className="animate-pulse text-xs uppercase tracking-widest font-extrabold text-orange-600">Memuat data perusahaan...</p>
           </div>
         )}
 
@@ -879,8 +878,8 @@ export default function AdminApp() {
             {/* Timeframe selector */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-4 rounded-none border-2 border-stone-900 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.9)] gap-3">
               <div>
-                <h4 className="font-extrabold text-sm text-stone-900 uppercase tracking-wider">Timeline Analytical Window</h4>
-                <p className="text-[10px] text-stone-500 font-mono uppercase mt-0.5">Filter by date range — powered by backend aggregation</p>
+                <h4 className="font-extrabold text-sm text-stone-900 uppercase tracking-wider">Jendela Analitik Garis Waktu</h4>
+                <p className="text-[10px] text-stone-500 font-mono uppercase mt-0.5">Filter berdasarkan rentang tanggal — didukung oleh agregasi backend</p>
               </div>
               <div className="flex gap-2 text-xs font-mono items-center self-stretch sm:self-auto">
                 <input 
@@ -889,7 +888,7 @@ export default function AdminApp() {
                   onChange={e => setAnalyticsStartDate(e.target.value)}
                   className="bg-stone-50 border border-stone-300 px-2 py-1.5 focus:outline-none focus:border-orange-600"
                 />
-                <span className="font-bold text-stone-400">to</span>
+                <span className="font-bold text-stone-400">hingga</span>
                 <input 
                   type="date" 
                   value={analyticsEndDate} 
@@ -904,15 +903,15 @@ export default function AdminApp() {
               <div className="bg-white border-2 border-stone-900 rounded-none p-6 relative overflow-hidden flex flex-col justify-between shadow-[4px_4px_0px_0px_rgba(0,0,0,0.9)] text-stone-900 animate-scale-in">
                 <div>
                   <div className="flex justify-between items-center mb-4">
-                    <span className="text-[10px] font-extrabold text-stone-500 uppercase tracking-widest font-mono">Gross Revenue</span>
+                    <span className="text-[10px] font-extrabold text-stone-500 uppercase tracking-widest font-mono">Pendapatan Kotor</span>
                     <div className="bg-orange-100 text-orange-600 p-2 rounded-none border border-orange-200">
                       <CircleDollarSign className="w-5 h-5" />
                     </div>
                   </div>
                   <h3 className="text-2xl font-black text-stone-900 font-sans tracking-tight">
-                    Rp {analytics.total_revenue.toLocaleString("id-ID")}
+                    Rp {Number(analytics.total_revenue).toLocaleString("id-ID")}
                   </h3>
-                  <p className="text-[10px] text-stone-400 mt-1 font-mono uppercase tracking-wider">Based on custom timeline</p>
+                  <p className="text-[10px] text-stone-400 mt-1 font-mono uppercase tracking-wider">Berdasarkan garis waktu kustom</p>
                 </div>
                 <div className="absolute right-[-20px] bottom-[-20px] opacity-5">
                   <CircleDollarSign className="w-24 h-24 text-stone-900" />
@@ -922,15 +921,15 @@ export default function AdminApp() {
               <div className="bg-white border-2 border-stone-900 rounded-none p-6 relative overflow-hidden flex flex-col justify-between shadow-[4px_4px_0px_0px_rgba(0,0,0,0.9)] text-stone-900 animate-scale-in">
                 <div>
                   <div className="flex justify-between items-center mb-4">
-                    <span className="text-[10px] font-extrabold text-stone-500 uppercase tracking-widest font-mono">Estimated Profit</span>
+                    <span className="text-[10px] font-extrabold text-stone-500 uppercase tracking-widest font-mono">Estimasi Keuntungan</span>
                     <div className="bg-emerald-100 text-emerald-600 p-2 rounded-none border border-emerald-200">
                       <TrendingUp className="w-5 h-5" />
                     </div>
                   </div>
                   <h3 className="text-2xl font-black text-emerald-700 font-sans tracking-tight">
-                    Rp {analytics.total_profit.toLocaleString("id-ID")}
+                    Rp {Number(analytics.total_profit).toLocaleString("id-ID")}
                   </h3>
-                  <p className="text-[10px] text-stone-400 mt-1 font-mono uppercase tracking-wider">Revenue minus recipe cost</p>
+                  <p className="text-[10px] text-stone-400 mt-1 font-mono uppercase tracking-wider">Pendapatan dikurangi biaya resep</p>
                 </div>
                 <div className="absolute right-[-20px] bottom-[-20px] opacity-5">
                   <TrendingUp className="w-24 h-24 text-stone-900" />
@@ -940,15 +939,15 @@ export default function AdminApp() {
               <div className="bg-white border-2 border-stone-900 rounded-none p-6 relative overflow-hidden flex flex-col justify-between shadow-[4px_4px_0px_0px_rgba(0,0,0,0.9)] text-stone-900 animate-scale-in">
                 <div>
                   <div className="flex justify-between items-center mb-4">
-                    <span className="text-[10px] font-extrabold text-stone-500 uppercase tracking-widest font-mono">Register Volume</span>
+                    <span className="text-[10px] font-extrabold text-stone-500 uppercase tracking-widest font-mono">Volume Registrasi</span>
                     <div className="bg-stone-100 text-stone-900 p-2 rounded-none border border-stone-300">
                       <ShoppingBag className="w-5 h-5" />
                     </div>
                   </div>
                   <h3 className="text-2xl font-black text-stone-900 font-sans tracking-tight">
-                    {analytics.order_count} tickets
+                    {analytics.order_count} tiket
                   </h3>
-                  <p className="text-[10px] text-stone-400 mt-1 font-mono uppercase tracking-wider">Completed transactions</p>
+                  <p className="text-[10px] text-stone-400 mt-1 font-mono uppercase tracking-wider">Transaksi selesai</p>
                 </div>
                 <div className="absolute right-[-20px] bottom-[-20px] opacity-5">
                   <ShoppingBag className="w-24 h-24 text-stone-900" />
@@ -962,12 +961,12 @@ export default function AdminApp() {
                 <div>
                   <h4 className="font-black text-sm text-stone-900 uppercase tracking-wider flex items-center gap-2">
                     <ChefHat className="w-4 h-4 text-orange-600" />
-                    <span>Dish Menu Performance Analysis</span>
+                    <span>Analisis Performa Menu Hidangan</span>
                   </h4>
-                  <p className="text-xs text-stone-500 mt-0.5">Analyze order volumes, margins, profits, and stock levels.</p>
+                  <p className="text-xs text-stone-500 mt-0.5">Analisis volume pesanan, margin, keuntungan, dan tingkat stok.</p>
                 </div>
                 <span className="text-[10px] font-mono px-2.5 py-1 bg-teal-50 text-teal-700 rounded-none border border-teal-200 font-bold uppercase tracking-wider self-start md:self-auto">
-                  {sortedPerformance.length} items evaluated
+                  {sortedPerformance.length} item dievaluasi
                 </span>
               </div>
 
@@ -977,7 +976,7 @@ export default function AdminApp() {
                   <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-3.5" />
                   <input
                     type="text"
-                    placeholder="Search dishes..."
+                    placeholder="Cari hidangan..."
                     value={dishSearchQuery}
                     onChange={(e) => setDishSearchQuery(e.target.value)}
                     className="w-full bg-stone-50 border border-stone-300 rounded-none pl-8 pr-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:border-orange-600 font-mono"
@@ -985,13 +984,13 @@ export default function AdminApp() {
                 </div>
 
                 <div className="flex items-center gap-2 bg-stone-50 border border-stone-300 px-3 py-2 text-xs font-mono">
-                  <span className="text-stone-400 font-bold uppercase text-[9px] tracking-wider shrink-0">Category:</span>
+                  <span className="text-stone-400 font-bold uppercase text-[9px] tracking-wider shrink-0">Kategori:</span>
                   <select
                     value={dishCategoryFilter}
                     onChange={(e) => setDishCategoryFilter(e.target.value)}
                     className="w-full bg-transparent text-stone-900 focus:outline-none border-0 p-0 font-bold cursor-pointer text-xs uppercase"
                   >
-                    <option value="all">All Categories</option>
+                    <option value="all">Semua Kategori</option>
                     {Array.from(new Set(menuItems.map(item => item.category))).map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
@@ -999,7 +998,7 @@ export default function AdminApp() {
                 </div>
 
                 <div className="flex items-center gap-2 bg-stone-50 border border-stone-300 px-3 py-2 text-xs font-mono">
-                  <span className="text-stone-400 font-bold uppercase text-[9px] tracking-wider shrink-0">Sort By:</span>
+                  <span className="text-stone-400 font-bold uppercase text-[9px] tracking-wider shrink-0">Urutkan Berdasarkan:</span>
                   <select
                     value={`${dishSortField}-${dishSortOrder}`}
                     onChange={(e) => {
@@ -1009,11 +1008,11 @@ export default function AdminApp() {
                     }}
                     className="w-full bg-transparent text-stone-900 focus:outline-none border-0 p-0 font-bold cursor-pointer text-xs"
                   >
-                    <option value="soldCount-desc">Highest Sales Volume</option>
-                    <option value="soldCount-asc">Lowest Sales Volume</option>
-                    <option value="revenue-desc">Highest Gross Revenue</option>
-                    <option value="profit-desc">Highest Total Profit</option>
-                    <option value="stock-asc">Lowest Stock Level</option>
+                    <option value="soldCount-desc">Volume Penjualan Tertinggi</option>
+                    <option value="soldCount-asc">Volume Penjualan Terendah</option>
+                    <option value="revenue-desc">Pendapatan Kotor Tertinggi</option>
+                    <option value="profit-desc">Total Keuntungan Tertinggi</option>
+                    <option value="stock-asc">Tingkat Stok Terendah</option>
                   </select>
                 </div>
               </div>
@@ -1023,35 +1022,35 @@ export default function AdminApp() {
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-stone-100 border-b-2 border-stone-200 font-mono text-[10px] text-stone-500 uppercase font-black">
-                      <th className="p-3">Dish / Menu Detail</th>
+                      <th className="p-3">Detail Hidangan / Menu</th>
                       <th className="p-3 text-right">
                         <button type="button" onClick={() => { setDishSortField("soldCount"); setDishSortOrder(dishSortField === "soldCount" && dishSortOrder === "desc" ? "asc" : "desc"); }} className="inline-flex items-center gap-1 font-bold hover:text-stone-900 transition-colors cursor-pointer uppercase">
-                          <span>Vol Sold</span><ArrowUpDown className="w-3 h-3 text-stone-400" />
+                          <span>Vol Terjual</span><ArrowUpDown className="w-3 h-3 text-stone-400" />
                         </button>
                       </th>
                       <th className="p-3 text-right">
                         <button type="button" onClick={() => { setDishSortField("revenue"); setDishSortOrder(dishSortField === "revenue" && dishSortOrder === "desc" ? "asc" : "desc"); }} className="inline-flex items-center gap-1 font-bold hover:text-stone-900 transition-colors cursor-pointer uppercase">
-                          <span>Revenue</span><ArrowUpDown className="w-3 h-3 text-stone-400" />
+                          <span>Pendapatan</span><ArrowUpDown className="w-3 h-3 text-stone-400" />
                         </button>
                       </th>
                       <th className="p-3 text-right">
                         <button type="button" onClick={() => { setDishSortField("profit"); setDishSortOrder(dishSortField === "profit" && dishSortOrder === "desc" ? "asc" : "desc"); }} className="inline-flex items-center gap-1 font-bold hover:text-stone-900 transition-colors cursor-pointer uppercase">
-                          <span>Profit / Margin</span><ArrowUpDown className="w-3 h-3 text-stone-400" />
+                          <span>Keuntungan / Margin</span><ArrowUpDown className="w-3 h-3 text-stone-400" />
                         </button>
                       </th>
                       <th className="p-3 text-right">
                         <button type="button" onClick={() => { setDishSortField("stock"); setDishSortOrder(dishSortField === "stock" && dishSortOrder === "desc" ? "asc" : "desc"); }} className="inline-flex items-center gap-1 font-bold hover:text-stone-900 transition-colors cursor-pointer uppercase">
-                          <span>Stock Status</span><ArrowUpDown className="w-3 h-3 text-stone-400" />
+                          <span>Status Stok</span><ArrowUpDown className="w-3 h-3 text-stone-400" />
                         </button>
                       </th>
-                      <th className="p-3 font-bold uppercase text-[9px] text-stone-500">Popular Addon</th>
+                      <th className="p-3 font-bold uppercase text-[9px] text-stone-500">Tambahan Populer</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-150">
                     {sortedPerformance.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="p-8 text-center text-stone-400 font-mono text-xs uppercase">
-                          No matching dishes analyzed in this timeframe window.
+                          Tidak ada hidangan yang cocok dianalisis dalam jendela waktu ini.
                         </td>
                       </tr>
                     ) : (
@@ -1089,10 +1088,10 @@ export default function AdminApp() {
                               {item.soldCount}<span className="text-[9px] text-stone-400 font-normal ml-0.5"> pcs</span>
                             </td>
                             <td className="p-3 text-right font-mono font-semibold text-stone-900">
-                              Rp {item.revenue.toLocaleString("id-ID")}
+                              Rp {Number(item.revenue).toLocaleString("id-ID")}
                             </td>
                             <td className="p-3 text-right font-mono">
-                              <div className="font-bold text-emerald-700">Rp {item.profit.toLocaleString("id-ID")}</div>
+                              <div className="font-bold text-emerald-700">Rp {Number(item.profit).toLocaleString("id-ID")}</div>
                               {item.revenue > 0 ? (
                                 <div className="text-[9px] font-semibold text-stone-500">
                                   Margin: <span className={item.marginPercent >= 50 ? "text-emerald-600 font-bold" : "text-stone-600 font-bold"}>{item.marginPercent}%</span>
@@ -1106,11 +1105,11 @@ export default function AdminApp() {
                                 <span className="text-[9px] font-black uppercase px-1.5 py-0.5 bg-red-100 text-red-700 border border-red-200 rounded-none">OUT</span>
                               ) : isLowStock ? (
                                 <div className="text-red-600 font-black flex flex-col items-end">
-                                  <span>{item.stock} left</span>
-                                  <span className="text-[7px] text-red-500 font-black uppercase leading-none">CRITICAL</span>
+                                  <span>{item.stock} tersisa</span>
+                                  <span className="text-[7px] text-red-500 font-black uppercase leading-none">KRITIS</span>
                                 </div>
                               ) : (
-                                <span className="text-stone-600">{item.stock ?? 0} units</span>
+                                <span className="text-stone-600">{item.stock ?? 0} unit</span>
                               )}
                             </td>
                             <td className="p-3 font-mono text-[10px] text-stone-700 capitalize">{item.topAddon}</td>
@@ -1128,34 +1127,34 @@ export default function AdminApp() {
                   <div className="flex gap-2 items-start">
                     <Sparkles className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-xs font-bold text-stone-900 uppercase">Top Performer</p>
+                      <p className="text-xs font-bold text-stone-900 uppercase">Performa Terbaik</p>
                       {(() => {
                         const topDish = [...sortedPerformance].sort((a, b) => b.soldCount - a.soldCount)[0];
                         if (topDish && topDish.soldCount > 0) {
                           return (
                             <p className="text-xs text-stone-600 mt-1">
-                              <strong>{topDish.name}</strong> ({topDish.branch_name}) with <strong>{topDish.soldCount} sold</strong>, profit <strong>Rp {topDish.profit.toLocaleString("id-ID")}</strong>.
+                              <strong>{topDish.name}</strong> ({topDish.branch_name}) dengan <strong>{topDish.soldCount} terjual</strong>, keuntungan <strong>Rp {Number(topDish.profit).toLocaleString("id-ID")}</strong>.
                             </p>
                           );
                         }
-                        return <p className="text-xs text-stone-500 mt-1">No sales logged yet.</p>;
+                        return <p className="text-xs text-stone-500 mt-1">Belum ada penjualan tercatat.</p>;
                       })()}
                     </div>
                   </div>
                   <div className="flex gap-2 items-start border-t md:border-t-0 md:border-l border-stone-200 pt-3 md:pt-0 md:pl-4">
                     <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-xs font-bold text-stone-900 uppercase">Stock Alerts</p>
+                      <p className="text-xs font-bold text-stone-900 uppercase">Peringatan Stok</p>
                       {(() => {
                         const lowStockItems = sortedPerformance.filter(i => i.stock !== undefined && i.stock <= 5);
                         if (lowStockItems.length > 0) {
                           return (
                             <p className="text-xs text-stone-600 mt-1">
-                              <strong>{lowStockItems.length} items</strong> with low inventory: <strong>{lowStockItems.map(i => i.name).slice(0, 3).join(", ")}{lowStockItems.length > 3 ? "..." : ""}</strong>.
+                              <strong>{lowStockItems.length} item</strong> dengan persediaan rendah: <strong>{lowStockItems.map(i => i.name).slice(0, 3).join(", ")}{lowStockItems.length > 3 ? "..." : ""}</strong>.
                             </p>
                           );
                         }
-                        return <p className="text-xs text-stone-500 mt-1">All inventory levels healthy.</p>;
+                        return <p className="text-xs text-stone-500 mt-1">Semua tingkat persediaan sehat.</p>;
                       })()}
                     </div>
                   </div>
@@ -1171,15 +1170,15 @@ export default function AdminApp() {
             <div className="p-4 border-b-2 border-stone-900 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
                 <h4 className="font-black text-sm text-stone-900 uppercase tracking-wider flex items-center gap-2">
-                  <History className="w-5 h-5 text-orange-600" /> Transactions Audit Log
+                  <History className="w-5 h-5 text-orange-600" /> Log Audit Transaksi
                 </h4>
-                <p className="text-[10px] text-stone-500 font-mono uppercase mt-0.5">Historical orders and operational performance</p>
+                <p className="text-[10px] text-stone-500 font-mono uppercase mt-0.5">Pesanan historis dan performa operasional</p>
               </div>
               <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <div className="relative">
                   <input 
                     type="text" 
-                    placeholder="Search Name, ID, Status..." 
+                    placeholder="Cari Nama, ID, Status..." 
                     value={transactionsSearch}
                     onChange={e => setTransactionsSearch(e.target.value)}
                     className="w-full sm:w-48 pl-8 pr-3 py-1.5 bg-stone-50 border border-stone-300 text-xs font-mono focus:outline-none focus:border-orange-600"
@@ -1193,7 +1192,7 @@ export default function AdminApp() {
                     onChange={e => setTransactionsStartDate(e.target.value)}
                     className="bg-stone-50 border border-stone-300 px-2 py-1.5 focus:outline-none focus:border-orange-600"
                   />
-                  <span className="font-bold text-stone-400">to</span>
+                  <span className="font-bold text-stone-400">hingga</span>
                   <input 
                     type="date" 
                     value={transactionsEndDate} 
@@ -1208,24 +1207,24 @@ export default function AdminApp() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-stone-100 border-b-2 border-stone-900 text-stone-900 uppercase text-[10px] tracking-wider">
-                    <th className="p-3 font-black whitespace-nowrap">Order Time</th>
-                    <th className="p-3 font-black whitespace-nowrap">Order ID</th>
-                    <th className="p-3 font-black whitespace-nowrap">Customer</th>
-                    <th className="p-3 font-black whitespace-nowrap">Phone</th>
-                    <th className="p-3 font-black whitespace-nowrap">Branch</th>
-                    <th className="p-3 font-black whitespace-nowrap">Type</th>
-                    <th className="p-3 font-black whitespace-nowrap">Table</th>
+                    <th className="p-3 font-black whitespace-nowrap">Waktu Pesanan</th>
+                    <th className="p-3 font-black whitespace-nowrap">ID Pesanan</th>
+                    <th className="p-3 font-black whitespace-nowrap">Pelanggan</th>
+                    <th className="p-3 font-black whitespace-nowrap">Telepon</th>
+                    <th className="p-3 font-black whitespace-nowrap">Cabang</th>
+                    <th className="p-3 font-black whitespace-nowrap">Tipe</th>
+                    <th className="p-3 font-black whitespace-nowrap">Meja</th>
                     <th className="p-3 font-black whitespace-nowrap">Total</th>
                     <th className="p-3 font-black whitespace-nowrap">Status</th>
-                    <th className="p-3 font-black text-right text-orange-700 whitespace-nowrap">Order ➜ Serve</th>
-                    <th className="p-3 font-black text-right text-emerald-700 whitespace-nowrap">Serve ➜ Pay</th>
+                    <th className="p-3 font-black text-right text-orange-700 whitespace-nowrap">Pesanan ➜ Disajikan</th>
+                    <th className="p-3 font-black text-right text-emerald-700 whitespace-nowrap">Disajikan ➜ Dibayar</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-150">
                   {isLoadingTransactions ? (
-                    <tr><td colSpan={11} className="p-8 text-center text-stone-400 font-mono text-xs uppercase tracking-widest">Loading transactions...</td></tr>
+                    <tr><td colSpan={11} className="p-8 text-center text-stone-400 font-mono text-xs uppercase tracking-widest">Memuat transaksi...</td></tr>
                   ) : transactions.length === 0 ? (
-                    <tr><td colSpan={11} className="p-8 text-center text-stone-400 font-mono text-xs uppercase tracking-widest">No transactions found for this date range.</td></tr>
+                    <tr><td colSpan={11} className="p-8 text-center text-stone-400 font-mono text-xs uppercase tracking-widest">Tidak ada transaksi ditemukan untuk rentang tanggal ini.</td></tr>
                   ) : (
                     transactions
                       .filter(o => 
@@ -1251,7 +1250,7 @@ export default function AdminApp() {
                           Rp {Math.max(0, order.total_amount - (order.discount_amount || 0)).toLocaleString("id-ID")}
                           {order.discount_amount && order.discount_amount > 0 && (
                             <div className="text-[9px] text-red-500 font-bold uppercase mt-0.5 px-1 bg-red-100 inline-block rounded-sm">
-                              -{order.discount_amount.toLocaleString("id-ID")}
+                              -{Number(order.discount_amount).toLocaleString("id-ID")}
                             </div>
                           )}
                         </td>
@@ -1288,8 +1287,8 @@ export default function AdminApp() {
                   <Building className="w-6 h-6 text-orange-600" />
                 </div>
                 <div>
-                  <h3 className="font-black text-xl uppercase tracking-widest text-stone-900">Branch Management</h3>
-                  <p className="text-[10px] text-stone-500 font-mono uppercase mt-1">Configure physical branch locations</p>
+                  <h3 className="font-black text-xl uppercase tracking-widest text-stone-900">Manajemen Cabang</h3>
+                  <p className="text-[10px] text-stone-500 font-mono uppercase mt-1">Konfigurasi lokasi fisik cabang</p>
                 </div>
               </div>
               <button 
@@ -1299,7 +1298,7 @@ export default function AdminApp() {
                 }} 
                 className="w-full sm:w-auto py-3 px-6 bg-orange-600 hover:bg-orange-500 text-white rounded-none font-bold text-xs uppercase tracking-widest transition-all shadow-md flex justify-center items-center gap-2"
               >
-                <Plus className="w-4 h-4" /> Create Branch
+                <Plus className="w-4 h-4" /> Buat Cabang
               </button>
             </div>
             
@@ -1308,7 +1307,7 @@ export default function AdminApp() {
                 <div key={b.name} className="p-4 bg-stone-50 border-2 border-stone-200 flex flex-col justify-between hover:border-stone-900 transition-all group">
                   <div className="mb-4">
                     <p className="font-black text-lg text-stone-900 uppercase tracking-wider">{b.name}</p>
-                    <p className="text-[10px] text-stone-500 font-mono uppercase mt-1">Theme: {b.color_theme}</p>
+                    <p className="text-[10px] text-stone-500 font-mono uppercase mt-1">Tema: {b.color_theme}</p>
                   </div>
                   <div className="flex items-center justify-between border-t border-dashed border-stone-300 pt-3">
                     <div className="bg-orange-50 text-orange-700 border border-orange-200 px-3 py-1 rounded-none text-xs font-mono font-bold">
@@ -1333,8 +1332,8 @@ export default function AdminApp() {
             <div className="bg-white border-2 border-stone-900 rounded-none p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.9)] text-stone-900">
               <div className="flex justify-between items-center mb-4 border-b border-stone-200 pb-3 flex-wrap gap-4">
                 <div className="flex items-center gap-3">
-                  <h4 className="font-black text-sm text-stone-900 uppercase tracking-wider">Active branch menu catalog</h4>
-                  <span className="text-[10px] text-stone-500 font-bold font-mono uppercase bg-stone-100 px-2 py-1">{menuItems.length} dishes synced</span>
+                  <h4 className="font-black text-sm text-stone-900 uppercase tracking-wider">Katalog menu cabang aktif</h4>
+                  <span className="text-[10px] text-stone-500 font-bold font-mono uppercase bg-stone-100 px-2 py-1">{menuItems.length} hidangan disinkronkan</span>
                 </div>
                 <button 
                   onClick={() => {
@@ -1344,22 +1343,22 @@ export default function AdminApp() {
                   className="py-2 px-4 bg-orange-600 hover:bg-orange-500 text-white rounded-none font-bold text-xs uppercase tracking-widest transition-all shadow-md flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
-                  Create New Menu Dish
+                  Buat Menu Hidangan Baru
                 </button>
               </div>
 
               <div className="mb-6 relative">
                 <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-3.5" />
-                <input type="text" placeholder="Filter dishes by name..." value={menuSearchQuery} onChange={(e) => setMenuSearchQuery(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none pl-8 pr-16 py-2.5 text-xs text-stone-900 focus:outline-none focus:border-orange-600 font-mono" />
+                <input type="text" placeholder="Filter hidangan berdasarkan nama..." value={menuSearchQuery} onChange={(e) => setMenuSearchQuery(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none pl-8 pr-16 py-2.5 text-xs text-stone-900 focus:outline-none focus:border-orange-600 font-mono" />
                 {menuSearchQuery && (
-                  <button type="button" onClick={() => setMenuSearchQuery("")} className="absolute right-3 top-3 text-stone-400 hover:text-stone-900 text-[10px] font-bold uppercase tracking-wider font-mono cursor-pointer">CLEAR</button>
+                  <button type="button" onClick={() => setMenuSearchQuery("")} className="absolute right-3 top-3 text-stone-400 hover:text-stone-900 text-[10px] font-bold uppercase tracking-wider font-mono cursor-pointer">HAPUS</button>
                 )}
               </div>
 
               <div className="space-y-3">
                 {menuItems.filter(item => item.name.toLowerCase().includes(menuSearchQuery.toLowerCase())).length === 0 ? (
                   <div className="p-8 text-center text-stone-400 font-mono text-xs uppercase border border-dashed border-stone-300">
-                    No dishes match filter.
+                    Tidak ada hidangan yang cocok dengan filter.
                   </div>
                 ) : (
                   <DndContext 
@@ -1396,8 +1395,8 @@ export default function AdminApp() {
             <div className="bg-white border-2 border-stone-900 rounded-none p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.9)] text-stone-900">
               <div className="flex justify-between items-center mb-4 border-b border-stone-200 pb-3 flex-wrap gap-4">
                 <div className="flex items-center gap-3">
-                  <h4 className="font-black text-sm text-stone-900 uppercase tracking-wider">Active branch ingredients</h4>
-                  <span className="text-[10px] text-stone-500 font-bold font-mono uppercase bg-stone-100 px-2 py-1">{ingredients.length} ingredients</span>
+                  <h4 className="font-black text-sm text-stone-900 uppercase tracking-wider">Bahan cabang aktif</h4>
+                  <span className="text-[10px] text-stone-500 font-bold font-mono uppercase bg-stone-100 px-2 py-1">{ingredients.length} bahan</span>
                 </div>
                 <button 
                   onClick={() => {
@@ -1407,22 +1406,22 @@ export default function AdminApp() {
                   className="py-2 px-4 bg-orange-600 hover:bg-orange-500 text-white rounded-none font-bold text-xs uppercase tracking-widest transition-all shadow-md flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
-                  Create New Ingredient
+                  Buat Bahan Baru
                 </button>
               </div>
 
               <div className="mb-6 relative">
                 <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-3.5" />
-                <input type="text" placeholder="Filter ingredients by name..." value={ingredientSearchQuery} onChange={(e) => setIngredientSearchQuery(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none pl-8 pr-16 py-2.5 text-xs text-stone-900 focus:outline-none focus:border-orange-600 font-mono" />
+                <input type="text" placeholder="Filter bahan berdasarkan nama..." value={ingredientSearchQuery} onChange={(e) => setIngredientSearchQuery(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none pl-8 pr-16 py-2.5 text-xs text-stone-900 focus:outline-none focus:border-orange-600 font-mono" />
                 {ingredientSearchQuery && (
-                  <button type="button" onClick={() => setIngredientSearchQuery("")} className="absolute right-3 top-3 text-stone-400 hover:text-stone-900 text-[10px] font-bold uppercase tracking-wider font-mono cursor-pointer">CLEAR</button>
+                  <button type="button" onClick={() => setIngredientSearchQuery("")} className="absolute right-3 top-3 text-stone-400 hover:text-stone-900 text-[10px] font-bold uppercase tracking-wider font-mono cursor-pointer">HAPUS</button>
                 )}
               </div>
 
               <div className="space-y-3">
                 {ingredients.filter(item => item.name.toLowerCase().includes(ingredientSearchQuery.toLowerCase())).length === 0 ? (
                   <div className="p-8 text-center text-stone-400 font-mono text-xs uppercase border border-dashed border-stone-300">
-                    No ingredients match filter.
+                    Tidak ada bahan yang cocok dengan filter.
                   </div>
                 ) : (
                   <DndContext 
@@ -1471,7 +1470,7 @@ export default function AdminApp() {
         <div className="p-4 bg-stone-900 text-white flex justify-between items-center shrink-0">
           <h3 className="font-black text-sm uppercase flex items-center gap-2">
             <Building className="w-4 h-4 text-orange-500" />
-            {editingBranch ? "Update Branch Details" : "Configure New Branch Outlet"}
+            {editingBranch ? "Perbarui Detail Cabang" : "Konfigurasi Cabang Baru"}
           </h3>
           <button 
             onClick={() => { setIsBranchModalOpen(false); resetBranchForm(); }}
@@ -1484,13 +1483,13 @@ export default function AdminApp() {
         <div className="p-6 overflow-y-auto font-mono text-xs flex-1 text-stone-900">
           <form onSubmit={editingBranch ? handleUpdateBranchSubmit : handleAddBranch} className="space-y-4">
             <div>
-              <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Branch Name</label>
+              <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Nama Cabang</label>
               <input type="text" required placeholder="e.g. Gayung Sari" disabled={!!editingBranch} value={branchFormName} onChange={(e) => setBranchFormName(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-4 py-3 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono disabled:opacity-50" />
             </div>
             
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Tax rate (%)</label>
+                <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Tarif pajak (%)</label>
                 <div className="relative">
                   <input type="number" required min="0" max="50" placeholder="e.g. 10" value={branchFormTax} onChange={(e) => setBranchFormTax(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none pl-4 pr-10 py-3 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
                   <Percent className="w-3.5 h-3.5 text-stone-500 absolute right-3.5 top-3.5" />
@@ -1498,7 +1497,7 @@ export default function AdminApp() {
               </div>
               
               <div>
-                <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Color Theme</label>
+                <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Tema Warna</label>
                 <select value={branchFormColor} onChange={(e) => setBranchFormColor(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-4 py-3 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono font-bold cursor-pointer">
                   {["stone", "teal", "indigo", "orange", "emerald"].map(c => (
                     <option key={c} value={c}>{c}</option>
@@ -1508,8 +1507,8 @@ export default function AdminApp() {
             </div>
 
             <div className="flex gap-2 pt-4 border-t border-stone-200">
-              <button type="submit" className="flex-1 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-none font-bold text-xs uppercase tracking-widest transition-all shadow-md">{editingBranch ? "Save Details" : "Save and Sync Branch"}</button>
-              <button type="button" onClick={() => { setIsBranchModalOpen(false); resetBranchForm(); }} className="px-6 py-3 bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-none font-bold text-xs uppercase shadow-sm">Cancel</button>
+              <button type="submit" className="flex-1 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-none font-bold text-xs uppercase tracking-widest transition-all shadow-md">{editingBranch ? "Simpan Detail" : "Simpan dan Sinkronkan Cabang"}</button>
+              <button type="button" onClick={() => { setIsBranchModalOpen(false); resetBranchForm(); }} className="px-6 py-3 bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-none font-bold text-xs uppercase shadow-sm">Batal</button>
             </div>
           </form>
 
@@ -1517,26 +1516,26 @@ export default function AdminApp() {
             <div className="mt-8 pt-8 border-t-2 border-stone-800">
               <h4 className="font-black text-sm text-stone-900 uppercase tracking-wider mb-4 flex items-center gap-2">
                 <ShieldAlert className="w-4 h-4 text-orange-600" />
-                Branch Staff Accounts
+                Akun Staf Cabang
               </h4>
               
               {isLoadingUsers ? (
-                <div className="text-center p-4 text-stone-500 font-mono text-xs uppercase">Loading accounts...</div>
+                <div className="text-center p-4 text-stone-500 font-mono text-xs uppercase">Memuat akun...</div>
               ) : (
                 <div className="space-y-3 mb-6">
                   {branchUsers.length === 0 ? (
                     <div className="bg-stone-100 p-4 border border-stone-200 text-center text-[10px] uppercase font-mono text-stone-500">
-                      No staff accounts configured for this branch.
+                      Tidak ada akun staf yang dikonfigurasi untuk cabang ini.
                     </div>
                   ) : (
                     branchUsers.map(u => (
                       <div key={u.id} className="bg-stone-100 border border-stone-300 p-3 flex justify-between items-center group">
                         <div>
                           <div className="font-bold text-sm uppercase tracking-wide">{u.username}</div>
-                          <div className="text-[10px] text-stone-500 font-mono uppercase bg-stone-200 px-1 inline-block mt-1">Role: {u.role}</div>
+                          <div className="text-[10px] text-stone-500 font-mono uppercase bg-stone-200 px-1 inline-block mt-1">Peran: {u.role}</div>
                         </div>
                         <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => handleChangeUserPassword(u.id, u.username)} className="px-3 py-1.5 bg-stone-800 text-white text-[10px] font-bold uppercase hover:bg-stone-700">Password</button>
+                          <button onClick={() => handleChangeUserPassword(u.id, u.username)} className="px-3 py-1.5 bg-stone-800 text-white text-[10px] font-bold uppercase hover:bg-stone-700">Kata Sandi</button>
                           <button onClick={() => handleDeleteUser(u.id, u.username)} className="px-3 py-1.5 bg-red-600 text-white text-[10px] font-bold uppercase hover:bg-red-500"><X className="w-3 h-3" /></button>
                         </div>
                       </div>
@@ -1546,26 +1545,26 @@ export default function AdminApp() {
               )}
 
               <div className="bg-stone-50 border border-stone-200 p-4">
-                <h5 className="font-bold text-xs uppercase tracking-widest text-stone-600 mb-3 border-b border-stone-200 pb-2">Add New Account</h5>
+                <h5 className="font-bold text-xs uppercase tracking-widest text-stone-600 mb-3 border-b border-stone-200 pb-2">Tambah Akun Baru</h5>
                 <form onSubmit={handleAddUser} className="space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Username</label>
+                      <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Nama Pengguna</label>
                       <input type="text" required value={newUserUsername} onChange={e => setNewUserUsername(e.target.value)} className="w-full bg-white border border-stone-300 px-3 py-2 text-xs font-mono focus:border-orange-600 outline-none" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Password</label>
+                      <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Kata Sandi</label>
                       <input type="password" required value={newUserPassword} onChange={e => setNewUserPassword(e.target.value)} className="w-full bg-white border border-stone-300 px-3 py-2 text-xs font-mono focus:border-orange-600 outline-none" />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Role</label>
+                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Peran</label>
                     <select value={newUserRole} onChange={e => setNewUserRole(e.target.value as any)} className="w-full bg-white border border-stone-300 px-3 py-2 text-xs font-mono font-bold focus:border-orange-600 outline-none">
                       <option value="cashier">Cashier</option>
                       <option value="employee">Employee (Kitchen)</option>
                     </select>
                   </div>
-                  <button type="submit" disabled={!newUserUsername || !newUserPassword} className="w-full py-2 bg-stone-900 text-white font-bold text-[10px] uppercase tracking-widest hover:bg-stone-800 disabled:opacity-50">Create Account</button>
+                  <button type="submit" disabled={!newUserUsername || !newUserPassword} className="w-full py-2 bg-stone-900 text-white font-bold text-[10px] uppercase tracking-widest hover:bg-stone-800 disabled:opacity-50">Buat Akun</button>
                 </form>
               </div>
             </div>
@@ -1583,7 +1582,7 @@ export default function AdminApp() {
             <div className="p-4 bg-stone-900 text-white flex justify-between items-center shrink-0">
               <h3 className="font-black text-sm uppercase flex items-center gap-2">
                 <ChefHat className="w-4 h-4 text-orange-500" />
-                {editingMenuItem ? "Modify Menu Dish" : "Create New Menu Dish"}
+                {editingMenuItem ? "Ubah Menu Hidangan" : "Buat Menu Hidangan Baru"}
               </h3>
               <button 
                 onClick={() => { setIsMenuModalOpen(false); resetMenuForm(); }}
@@ -1596,13 +1595,13 @@ export default function AdminApp() {
             <div className="p-6 overflow-y-auto font-mono text-xs flex-1 text-stone-900">
               <form onSubmit={(e) => { handleMenuFormSubmit(e); setIsMenuModalOpen(false); }} className="space-y-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Dish Name</label>
+                  <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Nama Hidangan</label>
                   <input type="text" required placeholder="e.g. Rawon Super Pedas" value={menuFormName} onChange={(e) => setMenuFormName(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-3 py-2.5 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Dine-In Price</label>
+                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Harga Makan di Tempat</label>
                     <input type="number" required placeholder="e.g. 45000" value={menuFormPrice} onChange={(e) => setMenuFormPrice(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-3 py-2.5 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
                   </div>
                   <div>
@@ -1618,17 +1617,17 @@ export default function AdminApp() {
                     <input type="number" placeholder="Optional" value={menuFormShopee} onChange={(e) => setMenuFormShopee(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-3 py-2.5 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
                   </div>
                   <div className="col-span-2 sm:col-span-1">
-                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Category</label>
+                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Kategori</label>
                     <select value={menuFormCategory} onChange={(e) => setMenuFormCategory(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-3 py-2.5 text-stone-900 focus:outline-none focus:border-orange-600 text-xs cursor-pointer font-bold font-mono">
                       {Array.from(new Set(menuItems.map(item => item.category))).map(cat => (
                         <option key={cat} value={cat}>{cat.toUpperCase()}</option>
                       ))}
                     </select>
                     <div className="mt-2 p-2 bg-stone-50 border border-stone-200">
-                      <label className="block text-[8px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Create custom category</label>
+                      <label className="block text-[8px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Buat kategori kustom</label>
                       <div className="flex gap-1">
                         <input type="text" placeholder="e.g. snack" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} className="flex-1 bg-white border border-stone-300 rounded-none px-2 py-1 text-stone-900 text-[10px] font-mono focus:outline-none focus:border-orange-600" />
-                        <button type="button" onClick={handleAddCategorySubmit} className="px-2.5 py-1 bg-stone-900 hover:bg-stone-850 text-white rounded-none text-[9px] font-bold uppercase tracking-wider">Add</button>
+                        <button type="button" onClick={handleAddCategorySubmit} className="px-2.5 py-1 bg-stone-900 hover:bg-stone-850 text-white rounded-none text-[9px] font-bold uppercase tracking-wider">Tambah</button>
                       </div>
                     </div>
                   </div>
@@ -1636,24 +1635,24 @@ export default function AdminApp() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Calculated Stock</label>
+                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Stok Dihitung</label>
                     <input type="text" readOnly value={menuFormStock} className="w-full bg-stone-200 border border-stone-300 rounded-none px-3 py-2.5 text-stone-500 focus:outline-none text-xs font-mono cursor-not-allowed" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Cost (Rp)</label>
+                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Biaya (Rp)</label>
                     <input type="number" required min="0" value={menuFormCost} onChange={(e) => setMenuFormCost(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-3 py-2.5 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
                   </div>
                 </div>
 
                 <div className="border border-stone-300 bg-stone-50 p-4 rounded-none">
                   <div className="flex justify-between items-center mb-3">
-                    <label className="block text-[10px] font-bold text-stone-900 uppercase tracking-widest font-mono">Bill of Materials (Ingredients)</label>
+                    <label className="block text-[10px] font-bold text-stone-900 uppercase tracking-widest font-mono">Daftar Bahan Baku (Bahan)</label>
                     <button type="button" onClick={() => setMenuFormIngredients([...menuFormIngredients, { ingredient_id: ingredients[0]?.id || 0, required_qty: "1" }])} className="px-2 py-1 bg-stone-900 text-white text-[9px] font-bold uppercase tracking-wider flex items-center gap-1">
-                      <Plus className="w-3 h-3" /> Add Ingredient
+                      <Plus className="w-3 h-3" /> Tambah Bahan
                     </button>
                   </div>
                   {menuFormIngredients.length === 0 ? (
-                    <p className="text-[10px] text-stone-500 font-mono italic">No ingredients assigned. Stock will calculate as 0.</p>
+                    <p className="text-[10px] text-stone-500 font-mono italic">Tidak ada bahan ditugaskan. Stok akan dihitung sebagai 0.</p>
                   ) : (
                     <div className="space-y-2">
                       {menuFormIngredients.map((mi, idx) => (
@@ -1685,7 +1684,7 @@ export default function AdminApp() {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Target Branch</label>
+                  <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Cabang Target</label>
                   <select value={menuFormBranch} onChange={(e) => setMenuFormBranch(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-3 py-2.5 text-stone-900 focus:outline-none focus:border-orange-600 text-xs cursor-pointer font-bold font-mono">
                     {branches.map(b => (
                       <option key={b.name} value={b.name}>{b.name}</option>
@@ -1694,30 +1693,30 @@ export default function AdminApp() {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Description</label>
-                  <textarea rows={2} placeholder="Short description..." value={menuFormDesc} onChange={(e) => setMenuFormDesc(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none p-3 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
+                  <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Deskripsi</label>
+                  <textarea rows={2} placeholder="Deskripsi singkat..." value={menuFormDesc} onChange={(e) => setMenuFormDesc(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none p-3 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Image URL</label>
+                  <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">URL Gambar</label>
                   <input type="url" placeholder="https://..." value={menuFormImage} onChange={(e) => setMenuFormImage(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-3 py-2.5 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Addon Options (comma-separated)</label>
+                  <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Opsi Tambahan (pisahkan dengan koma)</label>
                   <input type="text" placeholder="e.g. sambal, kerupuk" value={menuFormAddons} onChange={(e) => setMenuFormAddons(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-3 py-2.5 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
                 </div>
 
                 <div className="flex items-center justify-between p-3 bg-stone-50 rounded-none border border-stone-300">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-stone-600 font-mono">Available for orders</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-stone-600 font-mono">Tersedia untuk pesanan</span>
                   <button type="button" onClick={() => setMenuFormAvailable(!menuFormAvailable)} className="text-orange-600 hover:text-orange-500">
                     {menuFormAvailable ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8 text-stone-400" />}
                   </button>
                 </div>
 
                 <div className="flex gap-2 pt-4 border-t border-stone-200">
-                  <button type="submit" className="flex-1 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-none font-bold text-xs uppercase tracking-widest transition-all shadow-md">{editingMenuItem ? "Save changes" : "Deploy Dish"}</button>
-                  <button type="button" onClick={() => { setIsMenuModalOpen(false); resetMenuForm(); }} className="px-6 py-3 bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-none font-bold text-xs uppercase shadow-sm">Cancel</button>
+                  <button type="submit" className="flex-1 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-none font-bold text-xs uppercase tracking-widest transition-all shadow-md">{editingMenuItem ? "Simpan perubahan" : "Terapkan Hidangan"}</button>
+                  <button type="button" onClick={() => { setIsMenuModalOpen(false); resetMenuForm(); }} className="px-6 py-3 bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-none font-bold text-xs uppercase shadow-sm">Batal</button>
                 </div>
               </form>
             </div>
@@ -1733,7 +1732,7 @@ export default function AdminApp() {
             <div className="p-4 bg-stone-900 text-white flex justify-between items-center shrink-0">
               <h3 className="font-black text-sm uppercase flex items-center gap-2">
                 <ShoppingBag className="w-4 h-4 text-orange-500" />
-                {editingIngredient ? "Edit Ingredient Details" : "Configure New Ingredient"}
+                {editingIngredient ? "Edit Detail Bahan" : "Konfigurasi Bahan Baru"}
               </h3>
               <button onClick={() => { setIsIngredientModalOpen(false); resetIngredientForm(); }} className="text-stone-400 hover:text-white transition-colors">
                 <X className="w-4 h-4" />
@@ -1743,23 +1742,23 @@ export default function AdminApp() {
             <div className="p-6 overflow-y-auto font-mono text-xs flex-1 text-stone-900">
               <form onSubmit={handleIngredientFormSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Ingredient Name</label>
+                  <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Nama Bahan</label>
                   <input type="text" required placeholder="e.g. Daging Rawon" value={ingredientFormName} onChange={(e) => setIngredientFormName(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-3 py-2.5 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Unit</label>
+                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Satuan</label>
                     <input type="text" required placeholder="e.g. gr, pcs, portion" value={ingredientFormUnit} onChange={(e) => setIngredientFormUnit(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-3 py-2.5 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Initial Stock</label>
+                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Stok Awal</label>
                     <input type="number" step="any" required value={ingredientFormStock} onChange={(e) => setIngredientFormStock(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-3 py-2.5 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Branch</label>
+                  <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Cabang</label>
                   <select required value={ingredientFormBranch} onChange={(e) => setIngredientFormBranch(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-3 py-2.5 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono font-bold cursor-pointer">
                     <option value="">Select branch...</option>
                     {branches.map(b => (
@@ -1769,8 +1768,8 @@ export default function AdminApp() {
                 </div>
 
                 <div className="flex gap-2 pt-4 border-t border-stone-200">
-                  <button type="submit" className="flex-1 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-none font-bold text-xs uppercase tracking-widest transition-all shadow-md">{editingIngredient ? "Save changes" : "Create Ingredient"}</button>
-                  <button type="button" onClick={() => { setIsIngredientModalOpen(false); resetIngredientForm(); }} className="px-6 py-3 bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-none font-bold text-xs uppercase shadow-sm">Cancel</button>
+                  <button type="submit" className="flex-1 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-none font-bold text-xs uppercase tracking-widest transition-all shadow-md">{editingIngredient ? "Simpan perubahan" : "Buat Bahan"}</button>
+                  <button type="button" onClick={() => { setIsIngredientModalOpen(false); resetIngredientForm(); }} className="px-6 py-3 bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-none font-bold text-xs uppercase shadow-sm">Batal</button>
                 </div>
               </form>
             </div>
@@ -1787,7 +1786,7 @@ export default function AdminApp() {
             <div className="p-4 bg-stone-900 text-white flex justify-between items-center shrink-0">
               <h3 className="font-black text-sm uppercase flex items-center gap-2">
                 <Receipt className="w-4 h-4 text-orange-500" />
-                {["cooking", "cooked", "on_table"].includes(transactionReceiptOrder.status) ? "Kitchen Ticket" : "Final Cashier Receipt"}
+                {["cooking", "cooked", "on_table"].includes(transactionReceiptOrder.status) ? "Tiket Dapur" : "Resi Kasir Akhir"}
               </h3>
               <button 
                 onClick={() => setTransactionReceiptOrder(null)}
@@ -1801,16 +1800,16 @@ export default function AdminApp() {
               {/* Common Header */}
               <div className="text-center mb-6">
                 <h4 className="font-black text-lg uppercase tracking-widest border-b-2 border-stone-900 pb-2 mb-2">Rawon TM</h4>
-                <p className="font-bold">Branch: {transactionReceiptOrder.branch_name}</p>
-                <p>Order #{transactionReceiptOrder.daily_order_number || transactionReceiptOrder.id} • {formatLocalTime(transactionReceiptOrder.created_at)}</p>
+                <p className="font-bold">Cabang: {transactionReceiptOrder.branch_name}</p>
+                <p>Pesanan #{transactionReceiptOrder.daily_order_number || transactionReceiptOrder.id} • {formatLocalTime(transactionReceiptOrder.created_at)}</p>
                 <p className="mt-2 bg-stone-100 p-1 border border-stone-300 font-bold uppercase">
                   {transactionReceiptOrder.order_type} {transactionReceiptOrder.order_type === "dine-in" && `- Table ${transactionReceiptOrder.table_number}`}
                 </p>
                 {transactionReceiptOrder.customer_name && (
-                  <p className="mt-1 font-bold">Customer: {transactionReceiptOrder.customer_name}</p>
+                  <p className="mt-1 font-bold">Pelanggan: {transactionReceiptOrder.customer_name}</p>
                 )}
                 {transactionReceiptOrder.phone_number && transactionReceiptOrder.phone_number !== "Online" && (
-                  <p className="mt-1">Phone: {transactionReceiptOrder.phone_number}</p>
+                  <p className="mt-1">Telepon: {transactionReceiptOrder.phone_number}</p>
                 )}
               </div>
 
@@ -1842,38 +1841,38 @@ export default function AdminApp() {
                 <div className="space-y-1">
                   <div className="flex justify-between text-stone-600">
                     <span>Subtotal</span>
-                    <span>Rp {(transactionReceiptOrder.total_amount - transactionReceiptOrder.tax_amount).toLocaleString("id-ID")}</span>
+                    <span>Rp {Number((transactionReceiptOrder.total_amount - transactionReceiptOrder.tax_amount)).toLocaleString("id-ID")}</span>
                   </div>
                   <div className="flex justify-between text-stone-600 border-b border-stone-300 pb-2 mb-2">
-                    <span>Tax</span>
-                    <span>Rp {transactionReceiptOrder.tax_amount.toLocaleString("id-ID")}</span>
+                    <span>Pajak</span>
+                    <span>Rp {Number(transactionReceiptOrder.tax_amount).toLocaleString("id-ID")}</span>
                   </div>
                   <div className="flex justify-between font-black text-sm uppercase">
-                    <span>Total Amount</span>
-                    <span>Rp {transactionReceiptOrder.total_amount.toLocaleString("id-ID")}</span>
+                    <span>Total Harga</span>
+                    <span>Rp {Number(transactionReceiptOrder.total_amount).toLocaleString("id-ID")}</span>
                   </div>
                   {transactionReceiptOrder.discount_amount && transactionReceiptOrder.discount_amount > 0 && (
                     <div className="flex justify-between text-red-600 font-bold border-t border-red-200 pt-2 mt-2">
                       <div className="flex flex-col">
-                        <span>Discount / Write-Off</span>
-                        <span className="text-[9px] lowercase italic text-red-400">reason: {transactionReceiptOrder.discount_reason}</span>
+                        <span>Diskon / Penghapusan</span>
+                        <span className="text-[9px] lowercase italic text-red-400">alasan: {transactionReceiptOrder.discount_reason}</span>
                       </div>
-                      <span>- Rp {transactionReceiptOrder.discount_amount.toLocaleString("id-ID")}</span>
+                      <span>- Rp {Number(transactionReceiptOrder.discount_amount).toLocaleString("id-ID")}</span>
                     </div>
                   )}
                   <div className="flex justify-between font-black text-sm uppercase pt-2 border-t border-stone-800 mt-2">
-                    <span>Final Paid</span>
+                    <span>Total Dibayar</span>
                     <span>Rp {Math.max(0, transactionReceiptOrder.total_amount - (transactionReceiptOrder.discount_amount || 0)).toLocaleString("id-ID")}</span>
                   </div>
                   {transactionReceiptOrder.payment_method && (
                     <div className="flex justify-between font-bold text-[10px] uppercase mt-2">
-                      <span>Paid Via</span>
+                      <span>Dibayar Melalui</span>
                       <span className="bg-emerald-100 text-emerald-800 px-1 border border-emerald-300">{transactionReceiptOrder.payment_method}</span>
                     </div>
                   )}
                   {transactionReceiptOrder.paid_at && (
                     <div className="text-center text-[9px] text-stone-400 mt-6">
-                      Paid at: {formatLocalTime(transactionReceiptOrder.paid_at)}
+                      Dibayar pada: {formatLocalTime(transactionReceiptOrder.paid_at)}
                     </div>
                   )}
                 </div>
@@ -1886,7 +1885,7 @@ export default function AdminApp() {
                   className="w-full py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-colors"
                 >
                   <Trash className="w-3.5 h-3.5" />
-                  Delete Transaction
+                  Hapus Transaksi
                 </button>
               </div>
             </div>
@@ -1906,7 +1905,7 @@ export default function AdminApp() {
             <div className="p-4 bg-stone-900 text-white flex justify-between items-center shrink-0">
               <h3 className="font-black text-sm uppercase flex items-center gap-2">
                 <ArrowUpDown className="w-4 h-4 text-orange-500" />
-                Adjust Stock
+                Sesuaikan Stok
               </h3>
               <button onClick={() => { setAdjustStockIngredient(null); setAdjustStockAmount(""); }} className="text-stone-400 hover:text-white transition-colors">
                 <X className="w-4 h-4" />
@@ -1916,11 +1915,11 @@ export default function AdminApp() {
             <div className="p-6 text-stone-900 flex flex-col items-center">
               <h4 className="font-black text-lg text-center uppercase tracking-wider">{adjustStockIngredient.name}</h4>
               <p className="text-sm font-mono mt-1 mb-6 text-stone-500">
-                Current Stock: <span className="font-bold text-orange-600 text-base">{adjustStockIngredient.stock_qty}</span> {adjustStockIngredient.unit}
+                Stok Saat Ini: <span className="font-bold text-orange-600 text-base">{adjustStockIngredient.stock_qty}</span> {adjustStockIngredient.unit}
               </p>
               
               <div className="w-full mb-6">
-                <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-2 text-left">Adjustment Amount</label>
+                <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-2 text-left">Jumlah Penyesuaian</label>
                 <input 
                   type="number" 
                   step="any"
@@ -1938,21 +1937,21 @@ export default function AdminApp() {
                   disabled={!adjustStockAmount || isNaN(parseFloat(adjustStockAmount))}
                   className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-none font-bold text-xs uppercase tracking-widest transition-all shadow-md flex justify-center items-center gap-2 disabled:opacity-50"
                 >
-                  <Plus className="w-4 h-4" /> Add to Stock
+                  <Plus className="w-4 h-4" /> Tambah ke Stok
                 </button>
                 <button 
                   onClick={() => handleStockAdjustment("deduct")}
                   disabled={!adjustStockAmount || isNaN(parseFloat(adjustStockAmount))}
                   className="w-full py-3 bg-red-600 hover:bg-red-500 text-white rounded-none font-bold text-xs uppercase tracking-widest transition-all shadow-md flex justify-center items-center gap-2 disabled:opacity-50"
                 >
-                  <Minus className="w-4 h-4" /> Deduct from Stock
+                  <Minus className="w-4 h-4" /> Kurangi dari Stok
                 </button>
                 <button 
                   onClick={() => handleStockAdjustment("set")}
                   disabled={!adjustStockAmount || isNaN(parseFloat(adjustStockAmount))}
                   className="w-full py-3 bg-stone-800 hover:bg-stone-700 text-white rounded-none font-bold text-xs uppercase tracking-widest transition-all shadow-md flex justify-center items-center gap-2 disabled:opacity-50"
                 >
-                  <Equal className="w-4 h-4" /> Set Exact Stock
+                  <Equal className="w-4 h-4" /> Atur Stok Tepat
                 </button>
               </div>
             </div>

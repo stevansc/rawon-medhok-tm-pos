@@ -16,17 +16,17 @@ interface EmployeeAppProps {
 }
 
 const formatTimeElapsed = (totalMinutes: number) => {
-  if (totalMinutes < 60) return `${totalMinutes}m ago`;
+  if (totalMinutes < 60) return `${totalMinutes}m lalu`;
   const days = Math.floor(totalMinutes / 1440);
   const hours = Math.floor((totalMinutes % 1440) / 60);
   const mins = totalMinutes % 60;
   
   let parts = [];
-  if (days > 0) parts.push(`${days}d`);
-  if (hours > 0) parts.push(`${hours}h`);
+  if (days > 0) parts.push(`${days}h`);
+  if (hours > 0) parts.push(`${hours}j`);
   if (mins > 0 || parts.length === 0) parts.push(`${mins}m`);
   
-  return `${parts.join(" ")} ago`;
+  return `${parts.join(" ")} lalu`;
 };
 
 export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
@@ -88,7 +88,7 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
       result.forEach(o => seenOrderIds.current.add(o.id));
       setOrders(result);
     } catch (err: any) {
-      setOrdersError(err.message || "Failed to load employee orders.");
+      setOrdersError(err.message || "Gagal memuat pesanan karyawan.");
     } finally {
       setIsLoadingOrders(false);
     }
@@ -145,7 +145,7 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
         }))
       });
     } catch (err: any) {
-      alert(`Print failed: ${err.message}`);
+      alert(`Gagal mencetak: ${err.message}`);
     }
   };
 
@@ -162,7 +162,7 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: nextStatus } : o));
       await ApiService.updateOrderStatus(orderId, nextStatus);
     } catch (err: any) {
-      alert(`Failed to update status: ${err.message}`);
+      alert(`Gagal memperbarui status: ${err.message}`);
       fetchEmployeeOrders();
     }
   };
@@ -172,9 +172,9 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
     try {
       await connectPrinter();
       setAutoPrintEnabled(true);
-      alert("Printer connected! Auto-print is now active for new incoming orders.");
+      alert("Printer terhubung! Cetak otomatis sekarang aktif untuk pesanan baru yang masuk.");
     } catch (err: any) {
-      alert(`Failed to connect printer: ${err.message}`);
+      alert(`Gagal menghubungkan printer: ${err.message}`);
       setAutoPrintEnabled(false);
     }
   };
@@ -191,11 +191,11 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
   if (!auth.isAuthenticated) {
     return (
       <LoginScreen
-        title="Employee Console"
-        subtitle="Rawon TM Back-Of-House App"
+        title="Konsol Karyawan"
+        subtitle="Aplikasi Dapur Rawon TM"
         icon={<ChefHat className="w-10 h-10 text-white" />}
-        buttonText="Log In to Employee"
-        loadingText="Authorizing..."
+        buttonText="Masuk sebagai Karyawan"
+        loadingText="Membuka akses..."
         credentialHint={{ username: "employee", password: "employee123" }}
         username={auth.username}
         setUsername={auth.setUsername}
@@ -218,29 +218,29 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
           </div>
           <div>
             <h1 className="text-lg font-black tracking-tight text-white flex items-center gap-2 uppercase">
-              <span>Employee Display Board</span>
-              <span className="text-[10px] bg-red-600 text-white px-2 py-0.5 rounded-none font-bold uppercase tracking-wider animate-pulse">Live Queue</span>
+              <span>Papan Tampilan Karyawan</span>
+              <span className="text-[10px] bg-red-600 text-white px-2 py-0.5 rounded-none font-bold uppercase tracking-wider animate-pulse">Antrean Langsung</span>
             </h1>
             <p className="text-[10px] text-stone-400 font-mono flex items-center gap-1.5 mt-0.5 uppercase">
               <MapPin className="w-3.5 h-3.5 text-orange-500" />
-              <span>{auth.user!.role === 'admin' ? currentBranch : auth.user!.branch_name} Branch • Role: {auth.user!.role}</span>
+              <span>Cabang {auth.user!.role === 'admin' ? currentBranch : auth.user!.branch_name} • Peran: {auth.user!.role}</span>
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3 self-end md:self-auto">
           <div className="flex items-center bg-stone-800 text-xs font-bold uppercase tracking-wider overflow-hidden">
-            <button onClick={() => setActiveTab("queue")} className={`px-4 py-2 transition-colors ${activeTab === 'queue' ? 'bg-orange-600 text-white' : 'text-stone-400 hover:text-stone-200'}`}>Live Queue</button>
-            <button onClick={() => setActiveTab("order")} className={`px-4 py-2 transition-colors ${activeTab === 'order' ? 'bg-orange-600 text-white' : 'text-stone-400 hover:text-stone-200'}`}>Order Entry</button>
+            <button onClick={() => setActiveTab("queue")} className={`px-4 py-2 transition-colors ${activeTab === 'queue' ? 'bg-orange-600 text-white' : 'text-stone-400 hover:text-stone-200'}`}>Antrean Langsung</button>
+            <button onClick={() => setActiveTab("order")} className={`px-4 py-2 transition-colors ${activeTab === 'order' ? 'bg-orange-600 text-white' : 'text-stone-400 hover:text-stone-200'}`}>Entri Pesanan</button>
           </div>
 
           <button
             onClick={handleConnectPrinter}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-none text-xs font-bold uppercase tracking-wider transition-all ${autoPrintEnabled ? "bg-emerald-600 text-white hover:bg-emerald-700" : "bg-stone-700 text-stone-300 hover:bg-stone-600"}`}
-            title="Connect Auto-Printer"
+            title="Hubungkan Printer Otomatis"
           >
             <Printer className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">{autoPrintEnabled ? "Auto-Print ON" : "Connect Printer"}</span>
+            <span className="hidden md:inline">{autoPrintEnabled ? "Printer Otomatis AKTIF" : "Hubungkan Printer"}</span>
           </button>
 
           {activeTab === 'queue' && (
@@ -252,13 +252,13 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
                 onChange={(e) => setAutoPoll(e.target.checked)}
                 className="rounded-none border-stone-700 text-orange-600 focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 bg-stone-900"
               />
-              <span>Auto-refresh</span>
+              <span>Segarkan Otomatis</span>
             </label>
             <button
               onClick={fetchEmployeeOrders}
               disabled={isLoadingOrders}
               className="p-1 text-orange-500 hover:text-orange-400 disabled:text-stone-700 transition-colors"
-              title="Refresh Queue"
+              title="Segarkan Antrean"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoadingOrders ? "animate-spin" : ""}`} />
             </button>
@@ -270,7 +270,7 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
             className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-none text-xs font-bold uppercase tracking-wider transition-all"
           >
             <LogOut className="w-3.5 h-3.5" />
-            <span>Sign Out</span>
+            <span>Keluar</span>
           </button>
         </div>
       </header>
@@ -280,9 +280,9 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
           {/* Orders Filter Toolbar */}
           <div className="bg-stone-100 px-6 py-3 border-b border-stone-200 flex gap-2 overflow-x-auto">
           {[
-            { id: "active", label: "ALL ACTIVE TICKETS", count: orders.filter(o => o.status !== "completed" && o.status !== "discounted").length },
-            { id: "cooking", label: "COOKING", count: cookingCount },
-            { id: "on_table", label: "SERVED", count: onTableCount }
+            { id: "active", label: "SEMUA TIKET AKTIF", count: orders.filter(o => o.status !== "completed" && o.status !== "discounted").length },
+            { id: "cooking", label: "DIMASAK", count: cookingCount },
+            { id: "on_table", label: "DISAJIKAN", count: onTableCount }
           ].map(filter => (
           <button
             key={filter.id}
@@ -317,13 +317,13 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
         {isLoadingOrders && orders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-stone-400">
             <RefreshCw className="w-8 h-8 animate-spin text-orange-600 mb-2" />
-            <p className="text-xs font-mono">Fetching ticket queue...</p>
+            <p className="text-xs font-mono">Mengambil antrean tiket...</p>
           </div>
         ) : filteredOrders.length === 0 ? (
           <div className="text-center py-24 text-stone-400 flex flex-col items-center justify-center">
             <ChefHat className="w-16 h-16 text-stone-200 mb-3" />
-            <p className="font-extrabold text-sm uppercase tracking-wider text-stone-800">Employee Queue is Empty</p>
-            <p className="text-xs mt-1 max-w-xs font-mono">No active orders found.</p>
+            <p className="font-extrabold text-sm uppercase tracking-wider text-stone-800">Antrean Karyawan Kosong</p>
+            <p className="text-xs mt-1 max-w-xs font-mono">Tidak ada pesanan aktif ditemukan.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -341,10 +341,10 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
                     <div>
                       <div className="flex items-center gap-1.5">
                         {order.order_type === "dine-in" && (
-                          <span className="font-black text-white text-md uppercase">Table {order.table_number}</span>
+                          <span className="font-black text-white text-md uppercase">Meja {order.table_number}</span>
                         )}
                         <span className="text-[9px] px-1.5 py-0.5 bg-orange-600 text-white font-mono font-bold uppercase tracking-wider">
-                          {order.order_type === "takeaway" ? "Takeaway" : order.order_type}
+                          {order.order_type === "takeaway" ? "Bawa Pulang" : order.order_type}
                         </span>
                       </div>
                       <p className="text-[10px] font-bold text-stone-300 truncate max-w-[140px] uppercase mt-1 font-mono">{order.customer_name}</p>
@@ -392,7 +392,7 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
                       <button
                         onClick={() => setPrintedReceiptOrder(order)}
                         className="p-1.5 rounded-none transition-all active:scale-95 bg-stone-100 border border-stone-200 text-stone-600 hover:bg-stone-200 hover:text-stone-900"
-                        title="Reprint Ticket"
+                        title="Cetak Ulang Tiket"
                       >
                         <Printer className="w-4 h-4" />
                       </button>
@@ -403,13 +403,13 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
                         onClick={() => handleProgressStatus(order.id, order.status)}
                         className="px-3 py-2 rounded-none font-bold text-[10px] uppercase tracking-wider transition-all active:scale-95 flex items-center gap-1.5 shrink-0 bg-blue-600 text-white hover:bg-blue-700"
                       >
-                        <Check className="w-3.5 h-3.5" /><span>Mark as Served</span>
+                        <Check className="w-3.5 h-3.5" /><span>Tandai Disajikan</span>
                       </button>
                     )}
 
                     {order.status === "on_table" && (
                       <div className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-none text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 shrink-0 font-mono">
-                        <Check className="w-3.5 h-3.5" /><span>Ready at Table</span>
+                        <Check className="w-3.5 h-3.5" /><span>Siap di Meja</span>
                       </div>
                     )}
                   </div>
@@ -436,33 +436,33 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
         {printedReceiptOrder && (
           <>
             <div className="text-center pb-4 border-b border-dashed border-stone-300">
-              <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-[10px] font-bold uppercase tracking-wider mb-2 font-sans rounded-full">📶 Bluetooth Connected</span>
-              <h3 className="font-extrabold text-sm uppercase tracking-widest text-stone-800 animate-pulse">*** RECEIPT PRINTED ***</h3>
+              <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-[10px] font-bold uppercase tracking-wider mb-2 font-sans rounded-full">📶 Bluetooth Terhubung</span>
+              <h3 className="font-extrabold text-sm uppercase tracking-widest text-stone-800 animate-pulse">*** STRUK DICETAK ***</h3>
             </div>
             <div className="py-4 space-y-3 text-xs leading-relaxed">
               <div className="flex justify-between font-bold">
-                <span>ORDER: #{printedReceiptOrder.daily_order_number || printedReceiptOrder.id}</span>
-                <span>TABLE: {printedReceiptOrder.table_number}</span>
+                <span>PESANAN: #{printedReceiptOrder.daily_order_number || printedReceiptOrder.id}</span>
+                <span>MEJA: {printedReceiptOrder.table_number}</span>
               </div>
               <div className="border-b border-dashed border-stone-200 pb-2">
-                <p><span className="font-bold">CUST:</span> {printedReceiptOrder.customer_name ? printedReceiptOrder.customer_name.toUpperCase() : "GUEST"}</p>
-                <p><span className="font-bold">TYPE:</span> {printedReceiptOrder.order_type.toUpperCase()}</p>
+                <p><span className="font-bold">PELANGGAN:</span> {printedReceiptOrder.customer_name ? printedReceiptOrder.customer_name.toUpperCase() : "TAMU"}</p>
+                <p><span className="font-bold">TIPE:</span> {printedReceiptOrder.order_type.toUpperCase()}</p>
               </div>
               <div className="space-y-1.5 py-1">
                 {printedReceiptOrder.items.map((it, idx) => (
                   <div key={idx} className="flex flex-col">
-                    <span className="font-bold">{it.quantity}x {it.menu_item?.name.toUpperCase() || "UNKNOWN ITEM"}</span>
-                    {it.special_notes && <span className="text-[10px] text-stone-500 italic uppercase">Note: {it.special_notes}</span>}
+                    <span className="font-bold">{it.quantity}x {it.menu_item?.name.toUpperCase() || "ITEM TIDAK DIKENAL"}</span>
+                    {it.special_notes && <span className="text-[10px] text-stone-500 italic uppercase">Catatan: {it.special_notes}</span>}
                   </div>
                 ))}
               </div>
             </div>
             <div className="text-center pt-4 border-t border-dashed border-stone-300 flex flex-col gap-3">
               <button onClick={() => handleBluetoothPrint(printedReceiptOrder)} className="w-full py-2 bg-orange-600 text-white font-bold text-xs uppercase hover:bg-orange-500 rounded-none flex items-center justify-center gap-2">
-                <Printer className="w-4 h-4" /> Print Kitchen Ticket
+                <Printer className="w-4 h-4" /> Cetak Tiket Dapur
               </button>
-              <p className="text-[10px] text-stone-500 uppercase tracking-wider font-bold">--- Sent to Cooking Queue ---</p>
-              <p className="text-[9px] text-stone-400 mt-2">Closing automatically...</p>
+              <p className="text-[10px] text-stone-500 uppercase tracking-wider font-bold">--- Dikirim ke Antrean Masak ---</p>
+              <p className="text-[9px] text-stone-400 mt-2">Menutup secara otomatis...</p>
             </div>
           </>
         )}
