@@ -15,7 +15,8 @@ import {
   DndContext,
   closestCenter,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   DragEndEvent
@@ -120,7 +121,7 @@ function SortableMenuItem({ item, onToggleAvailability, onEdit, onDelete, branch
   );
 }
 
-function SortableIngredientItem({ item, onEdit, onDelete, onUpdateStock, branchColors }: { item: any, onEdit: (i: any) => void, onDelete: (id: number) => void, onUpdateStock: (i: any) => void, branchColors: string }) {
+function SortableIngredientItem({ item, onEdit, onDelete, onUpdateStock, branchColors }: { item: any, onEdit: (i: any) => void, onDelete: (id: number) => void, onUpdateStock: (i: any) => void, branchColors: { bg: string; text: string; border: string } }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -138,7 +139,7 @@ function SortableIngredientItem({ item, onEdit, onDelete, onUpdateStock, branchC
       <div className="flex-1 flex flex-col justify-center ml-8 min-w-0">
         <div className="flex items-center gap-2 mb-1 flex-wrap">
           <h5 className="font-black text-sm uppercase truncate tracking-wide text-stone-900">{item.name}</h5>
-          <span className={`text-[9px] px-1.5 py-0.5 rounded-none font-bold uppercase tracking-widest text-white ${branchColors}`}>{item.branch_name}</span>
+          <span className={`text-[9px] px-1.5 py-0.5 rounded-none font-bold uppercase tracking-widest border ${branchColors.bg} ${branchColors.text} ${branchColors.border}`}>{item.branch_name}</span>
         </div>
         <div className="flex gap-4 text-xs font-mono text-stone-500">
           <p>Stock: <span className="font-bold text-orange-600">{item.stock_qty}</span> {item.unit}</p>
@@ -166,7 +167,8 @@ export default function AdminApp() {
   const auth = useAuth({ allowedRoles: ["admin"] });
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
@@ -390,7 +392,11 @@ export default function AdminApp() {
         image_url: item.image_url,
         stock_count: item.stock_count,
         cost: item.cost,
-        addons: item.addons
+        addons: item.addons,
+        ingredients: item.ingredients ? item.ingredients.map((ing: any) => ({
+          ingredient_id: ing.ingredient_id,
+          required_qty: ing.required_qty
+        })) : []
       };
       const savedItem = await ApiService.updateMenuItem(item.id, updatedItem);
       setMenuItems(prev => prev.map(m => m.id === savedItem.id ? savedItem : m));
@@ -1417,7 +1423,7 @@ export default function AdminApp() {
                               setIngredients(prev => prev.filter(i => i.id !== id));
                             }
                           }}
-                          branchColors={getBranchColorClasses(item.branch_name).bg.replace('bg-', 'bg-').replace('50', '500')}
+                          branchColors={getBranchColorClasses(item.branch_name)}
                         />
                       ))}
                     </SortableContext>

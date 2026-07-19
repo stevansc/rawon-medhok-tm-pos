@@ -47,7 +47,8 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
         )
     access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
+        data={"sub": user.username, "role": user.role, "branch_name": user.branch_name, "id": user.id}, 
+        expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -171,13 +172,17 @@ def create_menu_item(item: schemas.MenuItemCreate, db: Session = Depends(get_db)
         ))
 
     db.commit()
-    db.refresh(db_item)
     
-    db_item.stock_count = 0 if not db_item.ingredients else int(min(
+    # Eager load ingredients to prevent N+1 queries during serialization
+    eager_db_item = db.query(models.MenuItem).options(
+        joinedload(models.MenuItem.ingredients).joinedload(models.MenuItemIngredient.ingredient)
+    ).filter(models.MenuItem.id == db_item.id).first()
+    
+    eager_db_item.stock_count = 0 if not eager_db_item.ingredients else int(min(
         (mapping.ingredient.stock_qty // mapping.required_qty)
-        for mapping in db_item.ingredients if mapping.required_qty > 0
+        for mapping in eager_db_item.ingredients if mapping.required_qty > 0
     ))
-    return db_item
+    return eager_db_item
 
 @app.put("/api/menu/{item_id}", response_model=schemas.MenuItemResponse)
 def update_menu_item(item_id: int, item: schemas.MenuItemCreate, db: Session = Depends(get_db), current_user: models.User = Depends(auth.require_role(["admin"]))):
@@ -201,13 +206,17 @@ def update_menu_item(item_id: int, item: schemas.MenuItemCreate, db: Session = D
         ))
 
     db.commit()
-    db.refresh(db_item)
     
-    db_item.stock_count = 0 if not db_item.ingredients else int(min(
+    # Eager load ingredients to prevent N+1 queries during serialization
+    eager_db_item = db.query(models.MenuItem).options(
+        joinedload(models.MenuItem.ingredients).joinedload(models.MenuItemIngredient.ingredient)
+    ).filter(models.MenuItem.id == item_id).first()
+    
+    eager_db_item.stock_count = 0 if not eager_db_item.ingredients else int(min(
         (mapping.ingredient.stock_qty // mapping.required_qty)
-        for mapping in db_item.ingredients if mapping.required_qty > 0
+        for mapping in eager_db_item.ingredients if mapping.required_qty > 0
     ))
-    return db_item
+    return eager_db_item
 
 @app.put("/api/admin/menu/reorder")
 def reorder_menu_items(request: schemas.MenuItemReorderRequest, db: Session = Depends(get_db), current_user: models.User = Depends(auth.require_role(["admin"]))):

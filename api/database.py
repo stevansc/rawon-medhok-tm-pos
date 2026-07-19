@@ -20,7 +20,6 @@ if db_url.startswith("postgres://"):
 # We use pool_pre_ping=True to prevent frozen connection errors on Vercel Serverless.
 engine = create_engine(
     db_url,
-    pool_pre_ping=True,
     pool_recycle=300, # Recycle connections every 5 mins to prevent stale drops
 )
 
