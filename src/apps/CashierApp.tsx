@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Order } from "../types";
 import { ApiService } from "../services/api";
+import { formatTimeGMT7 } from "../utils/time";
 import { useAuth } from "../hooks/useAuth";
 import LoginScreen from "../components/LoginScreen";
 import { Modal } from "../components/Modal";
@@ -420,7 +421,7 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
                 <div className="flex justify-between text-stone-400"><span>INVOICE ID:</span><span className="font-bold text-white">#{selectedOrder.daily_order_number || selectedOrder.id}</span></div>
                 <div className="flex justify-between text-stone-400"><span>TABLE NO:</span><span className="font-bold text-white uppercase">Table {selectedOrder.table_number}</span></div>
                 <div className="flex justify-between text-stone-400"><span>CUSTOMER:</span><span className="font-bold text-white uppercase">{selectedOrder.customer_name}</span></div>
-                <div className="flex justify-between text-stone-400"><span>CREATED:</span><span className="text-white">{new Date(selectedOrder.created_at.endsWith('Z') ? selectedOrder.created_at : selectedOrder.created_at + 'Z').toLocaleTimeString()}</span></div>
+                <div className="flex justify-between text-stone-400"><span>CREATED:</span><span className="text-white">{formatTimeGMT7(selectedOrder.created_at)}</span></div>
               </div>
 
               {/* Item details */}

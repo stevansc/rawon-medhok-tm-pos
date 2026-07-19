@@ -194,7 +194,7 @@ export default function AdminApp() {
   const formatLocalTime = (isoString?: string) => {
     if (!isoString) return "-";
     const d = new Date(isoString + (!isoString.endsWith('Z') ? 'Z' : ''));
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' });
   };
 
   // Active section tab

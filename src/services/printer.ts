@@ -16,7 +16,9 @@ declare global {
   }
 }
 
-interface BluetoothDeviceCompat {
+import { formatTimeGMT7, formatDateGMT7 } from "../utils/time";
+
+export interface BluetoothDeviceCompat {
   gatt?: {
     connected: boolean;
     connect(): Promise<BluetoothGATTServerCompat>;
@@ -155,7 +157,7 @@ export function buildReceiptBytes(data: ReceiptData): Uint8Array {
     encode(formatLine("INVOICE", "#" + data.invoiceNumber, W) + "\n"),
     encode(formatLine("TABLE", "TABLE " + data.tableNumber, W) + "\n"),
     encode(formatLine("CASHIER", data.cashierName.toUpperCase(), W) + "\n"),
-    encode(formatLine("DATE", new Date(data.createdAt).toLocaleDateString(), W) + "\n"),
+    encode(formatLine("DATE", formatDateGMT7(data.createdAt), W) + "\n"),
     buildSeparator(W),
 
     // Items
@@ -177,10 +179,10 @@ export function buildReceiptBytes(data: ReceiptData): Uint8Array {
     // Discount (conditional)
     ...(data.discountAmount && data.discountAmount > 0
       ? [
-          buildBold(true),
-          encode(formatLine("DISCOUNT", "- Rp " + data.discountAmount.toLocaleString("id-ID"), W) + "\n"),
-          buildBold(false),
-        ]
+        buildBold(true),
+        encode(formatLine("DISCOUNT", "- Rp " + data.discountAmount.toLocaleString("id-ID"), W) + "\n"),
+        buildBold(false),
+      ]
       : []),
 
     buildSeparator(W),
@@ -319,13 +321,13 @@ export function buildKitchenTicketBytes(data: KitchenTicketData): Uint8Array {
     encode(`TYPE: ${data.orderType.toUpperCase()}\n`),
     buildBold(false),
     buildSeparator(W),
-    
+
     buildAlign("left"),
     encode(formatLine("ORDER", "#" + data.invoiceNumber, W) + "\n"),
     encode(formatLine("CUST", data.customerName.toUpperCase(), W) + "\n"),
-    encode(formatLine("TIME", new Date(data.createdAt).toLocaleTimeString(), W) + "\n"),
+    encode(formatLine("TIME", formatTimeGMT7(data.createdAt), W) + "\n"),
     buildSeparator(W),
-    
+
     // Items
     ...data.items.flatMap(item => {
       const lines = [
@@ -341,10 +343,10 @@ export function buildKitchenTicketBytes(data: KitchenTicketData): Uint8Array {
       return lines;
     }),
     buildSeparator(W),
-    
+
     buildAlign("center"),
     encode("-- END OF TICKET --\n"),
-    
+
     buildFeed(4),
     buildCut()
   );

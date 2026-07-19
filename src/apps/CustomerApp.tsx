@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { MenuItem, OrderInput, Order, Branch, Promotion } from "../types";
 import { ApiService } from "../services/api";
+import { formatTimeGMT7 } from "../utils/time";
 import { 
   ShoppingBag, Search, Plus, Minus, FileText, 
   CheckCircle, MapPin, ClipboardList, Info, Sparkles,
@@ -319,7 +320,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
                 <p><span className="font-bold text-stone-900">CUSTOMER:</span> {placedOrder.customer_name}</p>
                 <p><span className="font-bold text-stone-900">TABLE NO:</span> {placedOrder.table_number}</p>
                 <p><span className="font-bold text-stone-900">BRANCH:</span> {placedOrder.branch_name}</p>
-                <p><span className="font-bold text-stone-900">TIME:</span> {new Date(placedOrder.created_at).toLocaleTimeString()}</p>
+                <p><span className="font-bold text-stone-900">TIME:</span> {formatTimeGMT7(placedOrder.created_at)}</p>
               </div>
 
               <div className="border-t border-stone-200 pt-3 space-y-1">
@@ -733,15 +734,7 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
                 <X className="w-4 h-4" />
               </button>
 
-              {/* Share Button (Aesthetic decoration to match screenshot) */}
-              <button 
-                type="button"
-                onClick={() => alert("Share link copied to clipboard!")}
-                className="absolute top-4 right-4 bg-black/40 hover:bg-black/60 text-white rounded-full p-2.5 flex items-center justify-center transition-all shadow-md"
-                title="Share dish"
-              >
-                <Share2 className="w-4 h-4" />
-              </button>
+              {/* Removed share button */}
             </div>
 
             {/* Title & Price Info section */}

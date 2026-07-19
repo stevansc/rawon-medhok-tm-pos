@@ -36,7 +36,7 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
   const [ordersError, setOrdersError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>("active");
+  const [statusFilter, setStatusFilter] = useState<string>("cooking");
   const [autoPoll, setAutoPoll] = useState(true);
   const [activeTab, setActiveTab] = useState<"queue" | "order">("queue");
   
