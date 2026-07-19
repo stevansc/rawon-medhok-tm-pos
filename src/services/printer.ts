@@ -223,7 +223,7 @@ export async function connectPrinter(): Promise<PrinterConnection> {
   }
 
   const device = await navigator.bluetooth.requestDevice({
-    filters: PRINTER_SERVICE_UUIDS.map(uuid => ({ services: [uuid] })),
+    acceptAllDevices: true,
     optionalServices: PRINTER_SERVICE_UUIDS,
   });
 
@@ -231,7 +231,25 @@ export async function connectPrinter(): Promise<PrinterConnection> {
     throw new Error("Bluetooth GATT not available on this device.");
   }
 
-  const server = await device.gatt.connect();
+  // A small delay helps on some Android devices before initiating GATT connect
+  await new Promise(r => setTimeout(r, 500));
+
+  let server;
+  let attempts = 0;
+  while (attempts < 3) {
+    try {
+      attempts++;
+      server = await device.gatt.connect();
+      break;
+    } catch (err) {
+      if (attempts >= 3) throw err;
+      await new Promise(r => setTimeout(r, 1000)); // wait 1s before retry
+    }
+  }
+
+  if (!server) {
+    throw new Error("Failed to connect to printer GATT server after 3 attempts.");
+  }
 
   for (const serviceUuid of PRINTER_SERVICE_UUIDS) {
     try {
