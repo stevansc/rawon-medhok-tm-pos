@@ -3,7 +3,8 @@ import { Order, OrderStatus } from "../types";
 import { ApiService } from "../services/api";
 import { useAuth } from "../hooks/useAuth";
 import LoginScreen from "../components/LoginScreen";
-import EmployeeOrderEntry from "./EmployeeOrderEntry";
+import EmployeeOrderEntry from './EmployeeOrderEntry';
+import { Modal } from '../components/Modal';
 import {
   Flame, Check, ChefHat, LogOut, Clock,
   MapPin, RefreshCw, AlertCircle, Printer
@@ -38,7 +39,15 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
   const [statusFilter, setStatusFilter] = useState<string>("active");
   const [autoPoll, setAutoPoll] = useState(true);
   const [activeTab, setActiveTab] = useState<"queue" | "order">("queue");
-  const [autoPrintEnabled, setAutoPrintEnabled] = useState(false);
+  
+  const [autoPrintEnabled, setAutoPrintEnabledState] = useState(false);
+  const autoPrintEnabledRef = useRef(false);
+  
+  const setAutoPrintEnabled = (val: boolean) => {
+    setAutoPrintEnabledState(val);
+    autoPrintEnabledRef.current = val;
+  };
+
   const seenOrderIds = useRef<Set<number>>(new Set());
   
   const [printedReceiptOrder, setPrintedReceiptOrder] = useState<Order | null>(null);
@@ -49,9 +58,11 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
     try {
       setIsLoadingOrders(true);
       setOrdersError(null);
-      const result = await ApiService.getOrders(auth.user.branch_name || currentBranch);
+      const activeBranch = auth.user.role === 'admin' ? currentBranch : auth.user.branch_name;
+      const result = await ApiService.getOrders(activeBranch);
       
-      if (autoPrintEnabled && isPrinterConnected()) {
+      // Use the ref here to avoid stale closures in the setInterval loop!
+      if (autoPrintEnabledRef.current && isPrinterConnected()) {
         const newOrders = result.filter(o => o.status === "cooking" && !seenOrderIds.current.has(o.id));
         for (const o of newOrders) {
           try {
@@ -116,6 +127,26 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
   const handleLogout = () => {
     auth.handleLogout();
     setOrders([]);
+  };
+
+  const handleBluetoothPrint = async (order: Order) => {
+    try {
+      await printKitchenTicket({
+        branchName: order.branch_name,
+        invoiceNumber: order.daily_order_number || order.id,
+        tableNumber: order.table_number,
+        customerName: order.customer_name || "Guest",
+        orderType: order.order_type,
+        createdAt: order.created_at,
+        items: order.items.map(it => ({
+          name: it.menu_item?.name || "Unknown",
+          quantity: it.quantity,
+          notes: it.special_notes || undefined,
+        }))
+      });
+    } catch (err: any) {
+      alert(`Print failed: ${err.message}`);
+    }
   };
 
   // Progress order status
@@ -192,7 +223,7 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
             </h1>
             <p className="text-[10px] text-stone-400 font-mono flex items-center gap-1.5 mt-0.5 uppercase">
               <MapPin className="w-3.5 h-3.5 text-orange-500" />
-              <span>{auth.user!.branch_name || currentBranch} Branch • Role: {auth.user!.role}</span>
+              <span>{auth.user!.role === 'admin' ? currentBranch : auth.user!.branch_name} Branch • Role: {auth.user!.role}</span>
             </p>
           </div>
         </div>
@@ -309,8 +340,12 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
                   <div className="p-4 bg-stone-900 text-white border-b-2 border-stone-900 flex justify-between items-start">
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="font-black text-white text-md uppercase">Table {order.table_number}</span>
-                        <span className="text-[9px] px-1.5 py-0.5 bg-orange-600 text-white font-mono font-bold uppercase tracking-wider">{order.order_type}</span>
+                        {order.order_type === "dine-in" && (
+                          <span className="font-black text-white text-md uppercase">Table {order.table_number}</span>
+                        )}
+                        <span className="text-[9px] px-1.5 py-0.5 bg-orange-600 text-white font-mono font-bold uppercase tracking-wider">
+                          {order.order_type === "takeaway" ? "Takeaway" : order.order_type}
+                        </span>
                       </div>
                       <p className="text-[10px] font-bold text-stone-300 truncate max-w-[140px] uppercase mt-1 font-mono">{order.customer_name}</p>
                     </div>
@@ -357,7 +392,7 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
                       <button
                         onClick={() => setPrintedReceiptOrder(order)}
                         className="p-1.5 rounded-none transition-all active:scale-95 bg-stone-100 border border-stone-200 text-stone-600 hover:bg-stone-200 hover:text-stone-900"
-                        title="Reprint Receipt"
+                        title="Reprint Ticket"
                       >
                         <Printer className="w-4 h-4" />
                       </button>
@@ -387,14 +422,19 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
       </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-hidden">
-          <EmployeeOrderEntry currentBranch={auth.user!.branch_name || currentBranch} onOrderPlaced={() => setActiveTab("queue")} />
+          <EmployeeOrderEntry currentBranch={auth.user!.role === 'admin' ? currentBranch : (auth.user!.branch_name || currentBranch)} onOrderPlaced={() => setActiveTab("queue")} />
         </div>
       )}
 
       {/* Bluetooth Printer Receipt Modal */}
-      {printedReceiptOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/80 backdrop-blur-xs p-4 animate-fade-in">
-          <div className="bg-white text-stone-900 w-full max-w-sm border-4 border-double border-stone-900 p-6 shadow-2xl relative flex flex-col font-mono animate-scale-in">
+      <Modal
+        isOpen={!!printedReceiptOrder}
+        onClose={() => setPrintedReceiptOrder(null)}
+        backdropClassName="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/80 backdrop-blur-xs p-4 animate-fade-in"
+        className="bg-white text-stone-900 w-full max-w-sm border-4 border-double border-stone-900 p-6 shadow-2xl relative flex flex-col font-mono animate-scale-in"
+      >
+        {printedReceiptOrder && (
+          <>
             <div className="text-center pb-4 border-b border-dashed border-stone-300">
               <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-[10px] font-bold uppercase tracking-wider mb-2 font-sans rounded-full">📶 Bluetooth Connected</span>
               <h3 className="font-extrabold text-sm uppercase tracking-widest text-stone-800 animate-pulse">*** RECEIPT PRINTED ***</h3>
@@ -417,13 +457,16 @@ export default function EmployeeApp({ currentBranch }: EmployeeAppProps) {
                 ))}
               </div>
             </div>
-            <div className="text-center pt-4 border-t border-dashed border-stone-300">
+            <div className="text-center pt-4 border-t border-dashed border-stone-300 flex flex-col gap-3">
+              <button onClick={() => handleBluetoothPrint(printedReceiptOrder)} className="w-full py-2 bg-orange-600 text-white font-bold text-xs uppercase hover:bg-orange-500 rounded-none flex items-center justify-center gap-2">
+                <Printer className="w-4 h-4" /> Print Kitchen Ticket
+              </button>
               <p className="text-[10px] text-stone-500 uppercase tracking-wider font-bold">--- Sent to Cooking Queue ---</p>
               <p className="text-[9px] text-stone-400 mt-2">Closing automatically...</p>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
     </div>
   );
 }

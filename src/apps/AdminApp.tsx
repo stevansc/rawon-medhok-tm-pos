@@ -4,11 +4,12 @@ import { FALLBACK_IMAGE_URL } from "../types";
 import { ApiService } from "../services/api";
 import { useAuth } from "../hooks/useAuth";
 import LoginScreen from "../components/LoginScreen";
+import { Modal } from "../components/Modal";
 import {
   Building, Settings, Plus, Edit,
   TrendingUp, CircleDollarSign, ShoppingBag, LogOut,
   AlertCircle, Sparkles, ChefHat, ToggleLeft, ToggleRight, Percent,
-  Search, ArrowUpDown, Flame, History, Clock, Calculator, Receipt, Trash, GripVertical, X, Equal, Minus
+  Search, ArrowUpDown, Flame, History, Clock, Calculator, Receipt, Trash, GripVertical, X, Equal, Minus, ShieldAlert
 } from "lucide-react";
 import { Order } from "../types";
 import {
@@ -207,16 +208,30 @@ export default function AdminApp() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Management Form states
-  const [newBranchName, setNewBranchName] = useState("");
-  const [newBranchTax, setNewBranchTax] = useState("10");
-  const [newBranchColor, setNewBranchColor] = useState("stone");
-
-  // Branch editing states
+  // Branch configuration states
+  const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
   const [branchFormName, setBranchFormName] = useState("");
   const [branchFormTax, setBranchFormTax] = useState("10");
   const [branchFormColor, setBranchFormColor] = useState("stone");
+
+  const resetBranchForm = () => {
+    setEditingBranch(null);
+    setBranchFormName("");
+    setBranchFormTax("10");
+    setBranchFormColor("stone");
+    setBranchUsers([]);
+    setNewUserUsername("");
+    setNewUserPassword("");
+    setNewUserRole("cashier");
+  };
+
+  // Branch User Management states
+  const [branchUsers, setBranchUsers] = useState<any[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [newUserUsername, setNewUserUsername] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("");
+  const [newUserRole, setNewUserRole] = useState<"cashier" | "employee">("cashier");
 
   // Menu editor form states
   const [isMenuModalOpen, setIsMenuModalOpen] = useState(false);
@@ -358,17 +373,18 @@ export default function AdminApp() {
   // Create new branch
   const handleAddBranch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newBranchName.trim()) return;
+    if (!branchFormName.trim()) return;
 
     try {
       setError(null);
-      const rate = parseFloat(newBranchTax) / 100;
+      const rate = parseFloat(branchFormTax) / 100;
       const newBranch = await ApiService.createBranch({
-        name: newBranchName,
+        name: branchFormName,
         tax_rate: isNaN(rate) ? 0.10 : rate,
-        color_theme: newBranchColor
+        color_theme: branchFormColor
       });
-      setNewBranchName("");
+      setIsBranchModalOpen(false);
+      resetBranchForm();
       setBranches(prev => [...prev, newBranch]);
       alert("New branch configured successfully.");
     } catch (err: any) {
@@ -645,6 +661,62 @@ export default function AdminApp() {
     setBranchFormName(branch.name);
     setBranchFormTax(Math.round(branch.tax_rate * 100).toString());
     setBranchFormColor(branch.color_theme || "stone");
+    fetchBranchUsers(branch.name);
+  };
+
+  const fetchBranchUsers = async (branchName: string) => {
+    try {
+      setIsLoadingUsers(true);
+      const users = await ApiService.getUsers(branchName);
+      setBranchUsers(users.filter(u => u.role !== "admin")); // Only show non-admins here
+    } catch (err: any) {
+      alert(`Failed to load branch users: ${err.message}`);
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  };
+
+  const handleAddUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBranch || !newUserUsername || !newUserPassword) return;
+    try {
+      await ApiService.createUser({
+        username: newUserUsername.trim(),
+        password: newUserPassword,
+        role: newUserRole,
+        branch_name: editingBranch.name
+      });
+      setNewUserUsername("");
+      setNewUserPassword("");
+      await fetchBranchUsers(editingBranch.name);
+      alert("User account created successfully.");
+    } catch (err: any) {
+      alert(`Failed to create user: ${err.message}`);
+    }
+  };
+
+  const handleChangeUserPassword = async (userId: number, username: string) => {
+    const newPassword = prompt(`Enter new password for ${username}:`);
+    if (!newPassword) return;
+    try {
+      await ApiService.updateUserPassword(userId, newPassword);
+      alert("Password updated successfully.");
+    } catch (err: any) {
+      alert(`Failed to update password: ${err.message}`);
+    }
+  };
+
+  const handleDeleteUser = async (userId: number, username: string) => {
+    if (!confirm(`Are you sure you want to delete the account for ${username}?`)) return;
+    try {
+      await ApiService.deleteUser(userId);
+      if (editingBranch) {
+        await fetchBranchUsers(editingBranch.name);
+      }
+      alert("User account deleted.");
+    } catch (err: any) {
+      alert(`Failed to delete user: ${err.message}`);
+    }
   };
 
   const handleUpdateBranchSubmit = async (e: React.FormEvent) => {
@@ -657,7 +729,8 @@ export default function AdminApp() {
         tax_rate: isNaN(taxRate) ? 0.10 : taxRate,
         color_theme: branchFormColor
       });
-      setEditingBranch(null);
+      setIsBranchModalOpen(false);
+      resetBranchForm();
       setBranches(prev => prev.map(b => b.name === editingBranch.name ? savedBranch : b));
       alert("Branch details updated successfully.");
     } catch (err: any) {
@@ -1208,95 +1281,48 @@ export default function AdminApp() {
 
         {/* 2. BRANCH CONFIGURATION VIEW */}
         {activeTab === "branches" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="bg-white border-2 border-stone-900 rounded-none p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.9)] text-stone-900">
-              {editingBranch ? (
-                <>
-                  <h4 className="font-black text-sm text-stone-900 mb-4 flex items-center gap-2 uppercase tracking-wider border-b border-stone-200 pb-2">
-                    <Edit className="w-4 h-4 text-orange-600" />
-                    <span>Update Branch: {editingBranch.name}</span>
-                  </h4>
-                  <form onSubmit={handleUpdateBranchSubmit} className="space-y-4 text-sm">
-                    <div>
-                      <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Branch Name</label>
-                      <input type="text" required value={branchFormName} onChange={(e) => setBranchFormName(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-4 py-3 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Tax rate (%)</label>
-                      <div className="relative">
-                        <input type="number" required min="0" max="50" value={branchFormTax} onChange={(e) => setBranchFormTax(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none pl-4 pr-10 py-3 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
-                        <Percent className="w-3.5 h-3.5 text-stone-500 absolute right-3.5 top-3.5" />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Color Theme</label>
-                      <select value={branchFormColor} onChange={(e) => setBranchFormColor(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-4 py-3 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono font-bold cursor-pointer">
-                        {["stone", "teal", "indigo", "orange", "emerald"].map(c => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="flex gap-2">
-                      <button type="submit" className="flex-1 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-none font-bold text-xs uppercase tracking-widest transition-all shadow-md">Save Details</button>
-                      <button type="button" onClick={() => setEditingBranch(null)} className="px-4 py-3 bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-none font-bold text-xs uppercase">Cancel</button>
-                    </div>
-                  </form>
-                </>
-              ) : (
-                <>
-                  <h4 className="font-black text-sm text-stone-900 mb-4 flex items-center gap-2 uppercase tracking-wider border-b border-stone-200 pb-2">
-                    <Plus className="w-4 h-4 text-orange-600 animate-pulse" />
-                    <span>Configure New Branch Outlet</span>
-                  </h4>
-                  <form onSubmit={handleAddBranch} className="space-y-4 text-sm">
-                    <div>
-                      <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Branch Name</label>
-                      <input type="text" required placeholder="e.g. Gayung Sari" value={newBranchName} onChange={(e) => setNewBranchName(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-4 py-3 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Tax rate (%)</label>
-                      <div className="relative">
-                        <input type="number" required min="0" max="50" placeholder="e.g. 10" value={newBranchTax} onChange={(e) => setNewBranchTax(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none pl-4 pr-10 py-3 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
-                        <Percent className="w-3.5 h-3.5 text-stone-500 absolute right-3.5 top-3.5" />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Color Theme</label>
-                      <select value={newBranchColor} onChange={(e) => setNewBranchColor(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-4 py-3 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono font-bold cursor-pointer">
-                        {["stone", "teal", "indigo", "orange", "emerald"].map(c => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <button type="submit" className="w-full py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-none font-bold text-xs uppercase tracking-widest transition-all shadow-md active:scale-95">Save and Sync Branch</button>
-                  </form>
-                </>
-              )}
-            </div>
-
-            <div className="bg-white border-2 border-stone-900 rounded-none p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.9)] text-stone-900">
-              <h4 className="font-black text-sm text-stone-900 mb-4 flex items-center gap-2 uppercase tracking-wider border-b border-stone-200 pb-2">
-                <Building className="w-4 h-4 text-orange-600" />
-                <span>Synchronized Branches</span>
-              </h4>
-              <div className="space-y-3">
-                {branches.map(b => (
-                  <div key={b.name} className="p-4 bg-stone-50 rounded-none border border-stone-250 flex items-center justify-between hover:border-stone-900 transition-all group">
-                    <div>
-                      <p className="font-bold text-sm text-stone-900 uppercase">{b.name}</p>
-                      <p className="text-[10px] text-stone-400 mt-0.5 font-mono uppercase">Theme: {b.color_theme}</p>
-                    </div>
-                    <div className="flex items-center gap-2.5">
-                      <div className="bg-orange-50 text-orange-700 border border-orange-200 px-3 py-1.5 rounded-none text-xs font-mono font-bold">
-                        Tax: {Math.round(b.tax_rate * 100)}%
-                      </div>
-                      <button onClick={() => handleEditBranchSelect(b)} className="p-2 bg-stone-200 hover:bg-stone-300 text-stone-700 rounded-none transition-all" title="Edit branch">
-                        <Edit className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+          <div className="bg-white border-2 border-stone-900 rounded-none p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,0.9)] text-stone-900 relative">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 pb-4 border-b-2 border-stone-900">
+              <div className="flex items-center gap-3">
+                <div className="bg-orange-100 p-2 border border-orange-300">
+                  <Building className="w-6 h-6 text-orange-600" />
+                </div>
+                <div>
+                  <h3 className="font-black text-xl uppercase tracking-widest text-stone-900">Branch Management</h3>
+                  <p className="text-[10px] text-stone-500 font-mono uppercase mt-1">Configure physical branch locations</p>
+                </div>
               </div>
+              <button 
+                onClick={() => {
+                  resetBranchForm();
+                  setIsBranchModalOpen(true);
+                }} 
+                className="w-full sm:w-auto py-3 px-6 bg-orange-600 hover:bg-orange-500 text-white rounded-none font-bold text-xs uppercase tracking-widest transition-all shadow-md flex justify-center items-center gap-2"
+              >
+                <Plus className="w-4 h-4" /> Create Branch
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {branches.map(b => (
+                <div key={b.name} className="p-4 bg-stone-50 border-2 border-stone-200 flex flex-col justify-between hover:border-stone-900 transition-all group">
+                  <div className="mb-4">
+                    <p className="font-black text-lg text-stone-900 uppercase tracking-wider">{b.name}</p>
+                    <p className="text-[10px] text-stone-500 font-mono uppercase mt-1">Theme: {b.color_theme}</p>
+                  </div>
+                  <div className="flex items-center justify-between border-t border-dashed border-stone-300 pt-3">
+                    <div className="bg-orange-50 text-orange-700 border border-orange-200 px-3 py-1 rounded-none text-xs font-mono font-bold">
+                      Tax: {Math.round(b.tax_rate * 100)}%
+                    </div>
+                    <button 
+                      onClick={() => { handleEditBranchSelect(b); setIsBranchModalOpen(true); }} 
+                      className="p-2 bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-none transition-all shadow-sm flex items-center gap-1 text-[10px] font-bold uppercase"
+                    >
+                      <Edit className="w-3.5 h-3.5" /> Edit
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -1435,10 +1461,125 @@ export default function AdminApp() {
         )}
       </div>
 
+      {/* Branch Editor Modal */}
+      <Modal
+        isOpen={isBranchModalOpen}
+        onClose={() => { setIsBranchModalOpen(false); resetBranchForm(); }}
+        backdropClassName="fixed inset-0 bg-stone-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        className="bg-white border-2 border-stone-900 w-full max-w-lg shadow-[8px_8px_0px_0px_rgba(0,0,0,0.9)] rounded-none flex flex-col max-h-[95vh]"
+      >
+        <div className="p-4 bg-stone-900 text-white flex justify-between items-center shrink-0">
+          <h3 className="font-black text-sm uppercase flex items-center gap-2">
+            <Building className="w-4 h-4 text-orange-500" />
+            {editingBranch ? "Update Branch Details" : "Configure New Branch Outlet"}
+          </h3>
+          <button 
+            onClick={() => { setIsBranchModalOpen(false); resetBranchForm(); }}
+            className="text-stone-400 hover:text-white transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        
+        <div className="p-6 overflow-y-auto font-mono text-xs flex-1 text-stone-900">
+          <form onSubmit={editingBranch ? handleUpdateBranchSubmit : handleAddBranch} className="space-y-4">
+            <div>
+              <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Branch Name</label>
+              <input type="text" required placeholder="e.g. Gayung Sari" disabled={!!editingBranch} value={branchFormName} onChange={(e) => setBranchFormName(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-4 py-3 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono disabled:opacity-50" />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Tax rate (%)</label>
+                <div className="relative">
+                  <input type="number" required min="0" max="50" placeholder="e.g. 10" value={branchFormTax} onChange={(e) => setBranchFormTax(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none pl-4 pr-10 py-3 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono" />
+                  <Percent className="w-3.5 h-3.5 text-stone-500 absolute right-3.5 top-3.5" />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Color Theme</label>
+                <select value={branchFormColor} onChange={(e) => setBranchFormColor(e.target.value)} className="w-full bg-stone-50 border border-stone-300 rounded-none px-4 py-3 text-stone-900 focus:outline-none focus:border-orange-600 text-xs font-mono font-bold cursor-pointer">
+                  {["stone", "teal", "indigo", "orange", "emerald"].map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-4 border-t border-stone-200">
+              <button type="submit" className="flex-1 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-none font-bold text-xs uppercase tracking-widest transition-all shadow-md">{editingBranch ? "Save Details" : "Save and Sync Branch"}</button>
+              <button type="button" onClick={() => { setIsBranchModalOpen(false); resetBranchForm(); }} className="px-6 py-3 bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-none font-bold text-xs uppercase shadow-sm">Cancel</button>
+            </div>
+          </form>
+
+          {editingBranch && (
+            <div className="mt-8 pt-8 border-t-2 border-stone-800">
+              <h4 className="font-black text-sm text-stone-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-orange-600" />
+                Branch Staff Accounts
+              </h4>
+              
+              {isLoadingUsers ? (
+                <div className="text-center p-4 text-stone-500 font-mono text-xs uppercase">Loading accounts...</div>
+              ) : (
+                <div className="space-y-3 mb-6">
+                  {branchUsers.length === 0 ? (
+                    <div className="bg-stone-100 p-4 border border-stone-200 text-center text-[10px] uppercase font-mono text-stone-500">
+                      No staff accounts configured for this branch.
+                    </div>
+                  ) : (
+                    branchUsers.map(u => (
+                      <div key={u.id} className="bg-stone-100 border border-stone-300 p-3 flex justify-between items-center group">
+                        <div>
+                          <div className="font-bold text-sm uppercase tracking-wide">{u.username}</div>
+                          <div className="text-[10px] text-stone-500 font-mono uppercase bg-stone-200 px-1 inline-block mt-1">Role: {u.role}</div>
+                        </div>
+                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => handleChangeUserPassword(u.id, u.username)} className="px-3 py-1.5 bg-stone-800 text-white text-[10px] font-bold uppercase hover:bg-stone-700">Password</button>
+                          <button onClick={() => handleDeleteUser(u.id, u.username)} className="px-3 py-1.5 bg-red-600 text-white text-[10px] font-bold uppercase hover:bg-red-500"><X className="w-3 h-3" /></button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              <div className="bg-stone-50 border border-stone-200 p-4">
+                <h5 className="font-bold text-xs uppercase tracking-widest text-stone-600 mb-3 border-b border-stone-200 pb-2">Add New Account</h5>
+                <form onSubmit={handleAddUser} className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Username</label>
+                      <input type="text" required value={newUserUsername} onChange={e => setNewUserUsername(e.target.value)} className="w-full bg-white border border-stone-300 px-3 py-2 text-xs font-mono focus:border-orange-600 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Password</label>
+                      <input type="password" required value={newUserPassword} onChange={e => setNewUserPassword(e.target.value)} className="w-full bg-white border border-stone-300 px-3 py-2 text-xs font-mono focus:border-orange-600 outline-none" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-widest font-mono mb-1">Role</label>
+                    <select value={newUserRole} onChange={e => setNewUserRole(e.target.value as any)} className="w-full bg-white border border-stone-300 px-3 py-2 text-xs font-mono font-bold focus:border-orange-600 outline-none">
+                      <option value="cashier">Cashier</option>
+                      <option value="employee">Employee (Kitchen)</option>
+                    </select>
+                  </div>
+                  <button type="submit" disabled={!newUserUsername || !newUserPassword} className="w-full py-2 bg-stone-900 text-white font-bold text-[10px] uppercase tracking-widest hover:bg-stone-800 disabled:opacity-50">Create Account</button>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>
+
       {/* Menu Editor Modal */}
-      {isMenuModalOpen && (
-        <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border-2 border-stone-900 w-full max-w-3xl shadow-[8px_8px_0px_0px_rgba(0,0,0,0.9)] rounded-none flex flex-col max-h-[95vh]">
+      <Modal
+        isOpen={isMenuModalOpen}
+        onClose={() => { setIsMenuModalOpen(false); resetMenuForm(); }}
+        backdropClassName="fixed inset-0 bg-stone-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        className="bg-white border-2 border-stone-900 w-full max-w-3xl shadow-[8px_8px_0px_0px_rgba(0,0,0,0.9)] rounded-none flex flex-col max-h-[95vh]"
+      >
             <div className="p-4 bg-stone-900 text-white flex justify-between items-center shrink-0">
               <h3 className="font-black text-sm uppercase flex items-center gap-2">
                 <ChefHat className="w-4 h-4 text-orange-500" />
@@ -1580,14 +1721,15 @@ export default function AdminApp() {
                 </div>
               </form>
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       {/* Ingredient Editor Modal */}
-      {isIngredientModalOpen && (
-        <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border-2 border-stone-900 w-full max-w-lg shadow-[8px_8px_0px_0px_rgba(0,0,0,0.9)] rounded-none flex flex-col max-h-[90vh]">
+      <Modal
+        isOpen={isIngredientModalOpen}
+        onClose={() => { setIsIngredientModalOpen(false); resetIngredientForm(); }}
+        backdropClassName="fixed inset-0 bg-stone-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        className="bg-white border-2 border-stone-900 w-full max-w-lg shadow-[8px_8px_0px_0px_rgba(0,0,0,0.9)] rounded-none flex flex-col max-h-[90vh]"
+      >
             <div className="p-4 bg-stone-900 text-white flex justify-between items-center shrink-0">
               <h3 className="font-black text-sm uppercase flex items-center gap-2">
                 <ShoppingBag className="w-4 h-4 text-orange-500" />
@@ -1632,13 +1774,16 @@ export default function AdminApp() {
                 </div>
               </form>
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
       {/* Transaction Receipt Modal */}
-      {transactionReceiptOrder && (
-        <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border-2 border-stone-900 w-full max-w-md shadow-[8px_8px_0px_0px_rgba(0,0,0,0.9)] rounded-none flex flex-col max-h-[90vh]">
+      <Modal
+        isOpen={!!transactionReceiptOrder}
+        onClose={() => setTransactionReceiptOrder(null)}
+        backdropClassName="fixed inset-0 bg-stone-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        className="bg-white border-2 border-stone-900 w-full max-w-md shadow-[8px_8px_0px_0px_rgba(0,0,0,0.9)] rounded-none flex flex-col max-h-[90vh]"
+      >
+        {transactionReceiptOrder && (
+          <>
             <div className="p-4 bg-stone-900 text-white flex justify-between items-center shrink-0">
               <h3 className="font-black text-sm uppercase flex items-center gap-2">
                 <Receipt className="w-4 h-4 text-orange-500" />
@@ -1745,14 +1890,19 @@ export default function AdminApp() {
                 </button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
 
       {/* Stock Adjustment Modal */}
-      {adjustStockIngredient && (
-        <div className="fixed inset-0 bg-stone-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border-2 border-stone-900 w-full max-w-sm shadow-[8px_8px_0px_0px_rgba(0,0,0,0.9)] rounded-none flex flex-col">
+      <Modal
+        isOpen={!!adjustStockIngredient}
+        onClose={() => setAdjustStockIngredient(null)}
+        backdropClassName="fixed inset-0 bg-stone-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        className="bg-white border-2 border-stone-900 w-full max-w-sm shadow-[8px_8px_0px_0px_rgba(0,0,0,0.9)] rounded-none flex flex-col"
+      >
+        {adjustStockIngredient && (
+          <>
             <div className="p-4 bg-stone-900 text-white flex justify-between items-center shrink-0">
               <h3 className="font-black text-sm uppercase flex items-center gap-2">
                 <ArrowUpDown className="w-4 h-4 text-orange-500" />
@@ -1806,9 +1956,9 @@ export default function AdminApp() {
                 </button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
     </div>
   );
 }

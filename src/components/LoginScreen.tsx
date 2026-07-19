@@ -90,14 +90,6 @@ export default function LoginScreen({
         </form>
       </div>
 
-      {credentialHint && (
-        <div className="mt-8 text-center p-4 bg-stone-950 rounded-none border border-stone-800 text-[10px] text-stone-400 font-mono">
-          <p className="font-bold text-orange-500 uppercase">Staff credentials:</p>
-          <p className="mt-1">
-            Username: <code className="text-white bg-stone-900 px-1.5 py-0.5 border border-stone-800 font-mono">{credentialHint.username}</code> | Password: <code className="text-white bg-stone-900 px-1.5 py-0.5 border border-stone-800 font-mono">{credentialHint.password}</code>
-          </p>
-        </div>
-      )}
     </div>
   );
 }

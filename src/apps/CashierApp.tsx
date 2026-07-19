@@ -3,6 +3,7 @@ import { Order } from "../types";
 import { ApiService } from "../services/api";
 import { useAuth } from "../hooks/useAuth";
 import LoginScreen from "../components/LoginScreen";
+import { Modal } from "../components/Modal";
 import {
   Banknote, Receipt, LogOut, Search, MapPin,
   RefreshCw, ShoppingCart, Check, Printer
@@ -35,7 +36,16 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
   const [discountAmount, setDiscountAmount] = useState<string>("");
   const [discountReason, setDiscountReason] = useState<string>("");
 
-  const [autoPrintEnabled, setAutoPrintEnabled] = useState(false);
+  const [autoPoll, setAutoPoll] = useState(true);
+  
+  const [autoPrintEnabled, setAutoPrintEnabledState] = useState(false);
+  const autoPrintEnabledRef = useRef(false);
+
+  const setAutoPrintEnabled = (val: boolean) => {
+    setAutoPrintEnabledState(val);
+    autoPrintEnabledRef.current = val;
+  };
+  
   const seenOrderIds = useRef<Set<number>>(new Set());
 
   // Fetch cashier orders
@@ -44,9 +54,10 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
     try {
       setIsLoadingOrders(true);
       setOrdersError(null);
-      const result = await ApiService.getOrders(auth.user.branch_name || currentBranch);
+      const activeBranch = auth.user.role === 'admin' ? currentBranch : auth.user.branch_name;
+      const result = await ApiService.getOrders(activeBranch);
 
-      if (autoPrintEnabled && isPrinterConnected()) {
+      if (autoPrintEnabledRef.current && isPrinterConnected()) {
         const newOrders = result.filter(o => o.status === "cooking" && !seenOrderIds.current.has(o.id));
         for (const o of newOrders) {
           try {
@@ -81,7 +92,18 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
   useEffect(() => {
     if (!auth.user) return;
     fetchOrders();
-  }, [auth.user]);
+
+    let pollInterval: NodeJS.Timeout;
+    if (autoPoll) {
+      pollInterval = setInterval(() => {
+        fetchOrders();
+      }, 8000);
+    }
+
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [auth.user, autoPoll]);
 
   // Printer modal timeout
   useEffect(() => {
@@ -136,6 +158,12 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
       setOrders(prev => prev.map(o => o.id === selectedOrder.id ? updated : o));
       setSelectedOrder(updated);
       setPrintedReceiptOrder(updated);
+      
+      // Auto-print receipt if enabled
+      if (autoPrintEnabled && isPrinterConnected()) {
+        handleBluetoothPrint(updated);
+      }
+      
       fetchOrders();
     } catch (err: any) {
       alert(`Payment failed: ${err.message}`);
@@ -250,7 +278,7 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
               </h1>
               <p className="text-[10px] text-stone-400 font-mono flex items-center gap-1.5 mt-0.5 uppercase">
                 <MapPin className="w-3.5 h-3.5 text-orange-500" />
-                <span>{auth.user!.branch_name || currentBranch} Branch • Cashier: {auth.user!.username}</span>
+                <span>{auth.user!.role === 'admin' ? currentBranch : auth.user!.branch_name} Branch   Cashier: {auth.user!.username}</span>
               </p>
             </div>
           </div>
@@ -264,6 +292,10 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
               <Printer className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{autoPrintEnabled ? "Auto-Print ON" : "Connect Printer"}</span>
             </button>
+            <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-stone-300 uppercase tracking-wider hover:text-white transition-colors">
+              <input type="checkbox" checked={autoPoll} onChange={(e) => setAutoPoll(e.target.checked)} className="w-3.5 h-3.5 accent-orange-600 cursor-pointer" />
+              <span className="hidden sm:inline">Auto-refresh</span>
+            </label>
             <button
               onClick={fetchOrders}
               disabled={isLoadingOrders}
@@ -340,7 +372,11 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
                 >
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="font-black text-stone-900 text-md uppercase">Table {order.table_number}</span>
+                      {order.order_type === "dine-in" ? (
+                        <span className="font-black text-stone-900 text-md uppercase">Table {order.table_number}</span>
+                      ) : (
+                        <span className="font-black text-stone-900 text-md uppercase">{order.order_type === "takeaway" ? "Takeaway" : order.order_type}</span>
+                      )}
                       <p className="text-[10px] text-stone-500 mt-1 font-bold uppercase tracking-wider font-mono truncate max-w-[120px]">{order.customer_name}</p>
                     </div>
                     <span className={`px-2 py-0.5 rounded-none text-[9px] font-bold uppercase tracking-wider font-mono ${
@@ -583,9 +619,14 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
       </div>
 
       {/* Bluetooth Printer Receipt Modal */}
-      {printedReceiptOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/80 backdrop-blur-xs p-4 animate-fade-in">
-          <div className="bg-white text-stone-900 w-full max-w-sm border-4 border-double border-stone-900 p-6 shadow-2xl relative flex flex-col font-mono animate-scale-in">
+      <Modal
+        isOpen={!!printedReceiptOrder}
+        onClose={() => setPrintedReceiptOrder(null)}
+        backdropClassName="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/80 backdrop-blur-xs p-4 animate-fade-in"
+        className="bg-white text-stone-900 w-full max-w-sm border-4 border-double border-stone-900 p-6 shadow-2xl relative flex flex-col font-mono animate-scale-in"
+      >
+        {printedReceiptOrder && (
+          <>
             <div className="text-center pb-4 border-b border-dashed border-stone-300">
               <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-[10px] font-bold uppercase tracking-wider mb-2 font-sans rounded-full">📶 Bluetooth Connected</span>
               <h3 className="font-extrabold text-sm uppercase tracking-widest text-stone-800 animate-pulse">*** CASHIER RECEIPT ***</h3>
@@ -619,13 +660,16 @@ export default function CashierApp({ currentBranch }: CashierAppProps) {
                 </div>
               </div>
             </div>
-            <div className="text-center pt-4 border-t border-dashed border-stone-300">
+            <div className="text-center pt-4 border-t border-dashed border-stone-300 flex flex-col gap-3">
+              <button onClick={() => handleBluetoothPrint(printedReceiptOrder)} className="w-full py-2 bg-orange-600 text-white font-bold text-xs uppercase hover:bg-orange-500 rounded-none flex items-center justify-center gap-2">
+                <Printer className="w-4 h-4" /> Print Receipt
+              </button>
               <p className="text-[10px] text-stone-500 uppercase tracking-wider font-bold">MATUR NUWUN!</p>
-              <p className="text-[9px] text-stone-400 mt-2">Closing automatically...</p>
+              <p className="text-[9px] text-stone-400">Closing automatically...</p>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
     </div>
   );
 }

@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, cast, Date
+from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
@@ -58,7 +59,7 @@ def get_current_user_profile(current_user: models.User = Depends(auth.get_curren
     return current_user
 
 @app.post("/api/users/", response_model=schemas.UserResponse)
-def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+def create_user(user: schemas.UserCreate, db: Session = Depends(get_db), current_user: models.User = Depends(auth.require_role(["admin"]))):
     db_user = db.query(models.User).filter(models.User.username == user.username).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
@@ -74,14 +75,49 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db.refresh(new_user)
     return new_user
 
+@app.get("/api/users/", response_model=List[schemas.UserResponse])
+def get_users(branch_name: Optional[str] = None, db: Session = Depends(get_db), current_user: models.User = Depends(auth.require_role(["admin"]))):
+    query = db.query(models.User)
+    if branch_name:
+        query = query.filter(models.User.branch_name == branch_name)
+    return query.all()
+
+class PasswordUpdate(schemas.BaseModel):
+    new_password: str
+
+@app.put("/api/users/{user_id}/password")
+def update_user_password(user_id: int, payload: PasswordUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(auth.require_role(["admin"]))):
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    db_user.password_hash = auth.get_password_hash(payload.new_password)
+    db.commit()
+    return {"message": "Password updated successfully"}
+
+@app.delete("/api/users/{user_id}")
+def delete_user(user_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(auth.require_role(["admin"]))):
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if db_user.role == "admin":
+        # Don't allow deleting admins via this simple endpoint to prevent locking out
+        raise HTTPException(status_code=400, detail="Cannot delete admin users from branch settings")
+    db.delete(db_user)
+    db.commit()
+    return {"message": "User deleted successfully"}
+
 # --- BRANCHES ---
 @app.post("/api/branches/", response_model=schemas.BranchResponse)
 def create_branch(branch: schemas.BranchBase, db: Session = Depends(get_db), current_user: models.User = Depends(auth.require_role(["admin"]))):
     db_branch = models.Branch(**branch.model_dump())
     db.add(db_branch)
-    db.commit()
-    db.refresh(db_branch)
-    return db_branch
+    try:
+        db.commit()
+        db.refresh(db_branch)
+        return db_branch
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Branch with name '{branch.name}' already exists.")
 
 @app.get("/api/branches/", response_model=List[schemas.BranchResponse])
 def get_branches(response: Response, db: Session = Depends(get_db)):
@@ -100,9 +136,13 @@ def update_branch(branch_name: str, branch: schemas.BranchBase, db: Session = De
     if branch.name != branch_name:
         db_branch.name = branch.name
 
-    db.commit()
-    db.refresh(db_branch)
-    return db_branch
+    try:
+        db.commit()
+        db.refresh(db_branch)
+        return db_branch
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Branch with name '{branch.name}' already exists.")
 
 # --- CATEGORIES ---
 @app.get("/api/categories", response_model=List[schemas.MenuCategoryResponse])
@@ -334,6 +374,11 @@ def get_orders(
         query = query.filter(models.Order.branch_name == branch_name)
     if status:
         query = query.filter(models.Order.status == status)
+    
+    # PERFORMANCE FIX: Only fetch orders from today.
+    # Admin dashboard uses /admin/transactions for historical data.
+    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    query = query.filter(models.Order.created_at >= today)
 
     return query.all()
 

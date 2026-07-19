@@ -6,6 +6,7 @@ import {
   CheckCircle, MapPin, ClipboardList, Info, Sparkles,
   Check, X, Share2
 } from "lucide-react";
+import { Modal } from "../components/Modal";
 
 interface CustomerAppProps {
   branchNameQuery?: string;
@@ -512,7 +513,13 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
 
       {/* Floating Bottom Cart Bar (if items in cart) */}
       {cart.length > 0 && !placedOrder && (
-        <div className="fixed bottom-0 max-w-md w-full bg-stone-900 text-white border-t-2 border-stone-900 px-4 py-3 shadow-2xl flex items-center justify-between z-30">
+        <div 
+          onClick={() => setIsCartOpen(true)}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsCartOpen(true); } }}
+          role="button"
+          tabIndex={0}
+          className="fixed bottom-0 max-w-md w-full bg-stone-900 text-white border-t-2 border-stone-900 px-4 py-3 shadow-2xl flex items-center justify-between z-30 cursor-pointer hover:bg-stone-800 transition-colors focus:outline-none focus:ring-2 focus:ring-orange-600"
+        >
           <div className="flex items-center gap-3">
             <div className="relative bg-orange-600 text-white p-2.5">
               <ShoppingBag className="w-4 h-4 text-white" />
@@ -526,165 +533,183 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
             </div>
           </div>
 
-          <button
-            onClick={() => setIsCartOpen(true)}
-            className="px-4 py-2.5 bg-orange-600 text-white font-bold text-[10px] uppercase tracking-wider shadow-md hover:bg-orange-700 active:scale-95 transition-all"
+          <div
+            className="px-4 py-2.5 bg-orange-600 text-white font-bold text-[10px] uppercase tracking-wider shadow-md transition-all"
           >
             Review Basket
-          </button>
-        </div>
-      )}
-
-      {/* Cart Review Side Drawer/Modal */}
-      {isCartOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white w-full max-w-md rounded-t-[32px] p-6 max-h-[90vh] overflow-y-auto flex flex-col shadow-2xl animate-slide-up">
-            
-            {/* Drawer Drag handle */}
-            <div className="w-12 h-1.5 bg-stone-200 rounded-full mx-auto mb-4" />
-
-            <div className="flex justify-between items-center border-b border-stone-200 pb-3">
-              <h3 className="font-extrabold text-md text-stone-900 flex items-center gap-2 uppercase tracking-wide">
-                <ShoppingBag className="w-5 h-5 text-orange-600" />
-                <span>Your Basket</span>
-              </h3>
-              <button 
-                onClick={() => setIsCartOpen(false)}
-                className="text-[10px] font-bold text-stone-500 hover:text-stone-900 bg-stone-100 px-3 py-1.5 uppercase tracking-wider font-mono"
-              >
-                Close
-              </button>
-            </div>
-
-            {/* Cart list */}
-            <div className="flex-1 overflow-y-auto space-y-4 py-4 max-h-[40vh]">
-              {cart.map((c, idx) => (
-                <div key={idx} className="border-b border-stone-100 pb-3 last:border-0">
-                  <div className="flex justify-between items-start gap-2">
-                    <div className="flex-1">
-                      <h5 className="font-bold text-sm text-stone-900">{c.item.name}</h5>
-                      <p className="text-xs text-stone-500 font-mono">Rp {c.item.price_normal.toLocaleString("id-ID")}</p>
-                      {c.selectedAddons && c.selectedAddons.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {c.selectedAddons.map(add => (
-                            <span key={add} className="bg-emerald-50 text-emerald-800 text-[9px] px-1.5 py-0.5 rounded-none font-bold uppercase font-mono">
-                              + {add}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2 bg-stone-100 p-1">
-                      <button 
-                        onClick={() => updateCartQuantity(c.id, -1)}
-                        className="w-7 h-7 bg-white text-stone-900 flex items-center justify-center hover:bg-stone-50 font-bold text-xs shadow-sm"
-                      >
-                        <Minus className="w-3 h-3" />
-                      </button>
-                      <span className="text-xs font-bold text-stone-900 w-4 text-center font-mono">{c.quantity}</span>
-                      <button 
-                        onClick={() => updateCartQuantity(c.id, 1)}
-                        className="w-7 h-7 bg-white text-stone-900 flex items-center justify-center hover:bg-stone-50 font-bold text-xs shadow-sm"
-                      >
-                        <Plus className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Item special notes */}
-                  <div className="mt-2 flex items-center gap-1.5">
-                    <FileText className="w-3 h-3 text-stone-400 shrink-0" />
-                    <input 
-                      type="text" 
-                      placeholder="Add special notes (e.g. no onions, extra spicy)..."
-                      value={c.notes}
-                      onChange={(e) => updateCartNotes(c.id, e.target.value)}
-                      className="w-full text-xs text-stone-600 bg-stone-50 border-b border-transparent focus:border-orange-600 focus:outline-none py-1 font-mono"
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Customer Details Form */}
-            <form onSubmit={handleSubmitOrder} className="border-t border-stone-200 pt-4 space-y-3">
-              <h4 className="font-black text-xs text-stone-900 uppercase tracking-wider mb-2">Customer Details</h4>
-              
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1">Your Name</label>
-                  <input 
-                    type="text" 
-                    required
-                    placeholder="Enter name"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full text-xs bg-stone-50 border border-stone-300 p-2.5 focus:outline-none focus:border-orange-600 rounded-none font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1">Phone Number</label>
-                  <input 
-                    type="tel" 
-                    placeholder="e.g. 081234..."
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    className="w-full text-xs bg-stone-50 border border-stone-300 p-2.5 focus:outline-none focus:border-orange-600 rounded-none font-mono"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1">Dining Option</label>
-                <select 
-                  value={orderType}
-                  onChange={(e) => setOrderType(e.target.value as "dine-in" | "take-away")}
-                  className="w-full text-xs bg-stone-50 border border-stone-300 p-2.5 focus:outline-none focus:border-orange-600 rounded-none font-mono font-bold"
-                >
-                  <option value="dine-in">🍽️ Dine-in</option>
-                  <option value="take-away">🛍️ Takeaway</option>
-                </select>
-              </div>
-
-              {/* Price Breakdown */}
-              <div className="bg-stone-100 p-4 mt-4 space-y-2 text-xs border border-stone-200">
-                <div className="flex justify-between text-stone-600">
-                  <span>Subtotal</span>
-                  <span className="font-mono">Rp {subtotal.toLocaleString("id-ID")}</span>
-                </div>
-                <div className="flex justify-between text-stone-600">
-                  <span>Tax ({Math.round(branchTaxRate * 100)}%)</span>
-                  <span className="font-mono">Rp {taxAmount.toLocaleString("id-ID")}</span>
-                </div>
-                <div className="flex justify-between font-black text-sm text-stone-900 border-t border-dashed border-stone-300 pt-2 mt-2">
-                  <span>Total Amount</span>
-                  <span className="font-mono text-orange-600">Rp {totalAmount.toLocaleString("id-ID")}</span>
-                </div>
-              </div>
-
-              {errorMessage && (
-                <div className="p-3 bg-red-50 text-red-700 text-xs rounded-none border border-red-200 font-mono">
-                  {errorMessage}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={isSubmittingOrder}
-                className="w-full mt-4 py-3.5 bg-orange-600 hover:bg-orange-700 disabled:bg-stone-300 disabled:text-stone-500 text-white font-bold text-sm uppercase tracking-wider rounded-none shadow-md active:scale-[0.98] transition-all"
-              >
-                {isSubmittingOrder ? "Placing Order..." : `Send Order • Rp ${totalAmount.toLocaleString("id-ID")}`}
-              </button>
-            </form>
           </div>
         </div>
       )}
 
+      {/* Cart Review Side Drawer/Modal */}
+      <Modal
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        backdropClassName="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-xs animate-fade-in"
+        className="w-full max-w-md"
+      >
+        <form onSubmit={handleSubmitOrder} className="bg-white w-full rounded-t-[32px] max-h-[90vh] flex flex-col shadow-2xl animate-slide-up overflow-hidden">
+            
+            {/* Sticky Header */}
+            <div className="sticky top-0 z-10 bg-white pt-6 px-6 pb-3 border-b border-stone-200 shrink-0">
+              {/* Drawer Drag handle */}
+              <div className="w-12 h-1.5 bg-stone-200 rounded-full mx-auto mb-4" />
+              <div className="flex justify-between items-center">
+                <h3 className="font-extrabold text-md text-stone-900 flex items-center gap-2 uppercase tracking-wide">
+                  <ShoppingBag className="w-5 h-5 text-orange-600" />
+                  <span>Your Basket</span>
+                </h3>
+                <button 
+                  type="button"
+                  onClick={() => setIsCartOpen(false)}
+                  className="text-[10px] font-bold text-stone-500 hover:text-stone-900 bg-stone-100 px-3 py-1.5 uppercase tracking-wider font-mono"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Body */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {/* Cart list */}
+              <div className="space-y-4 pb-4">
+                {cart.map((c, idx) => (
+                  <div key={idx} className="border-b border-stone-100 pb-3 last:border-0">
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex-1">
+                        <h5 className="font-bold text-sm text-stone-900">{c.item.name}</h5>
+                        <p className="text-xs text-stone-500 font-mono">Rp {c.item.price_normal.toLocaleString("id-ID")}</p>
+                        {c.selectedAddons && c.selectedAddons.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {c.selectedAddons.map(add => (
+                              <span key={add} className="bg-emerald-50 text-emerald-800 text-[9px] px-1.5 py-0.5 rounded-none font-bold uppercase font-mono">
+                                + {add}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 bg-stone-100 p-1">
+                        <button 
+                          type="button"
+                          onClick={() => updateCartQuantity(c.id, -1)}
+                          className="w-7 h-7 bg-white text-stone-900 flex items-center justify-center hover:bg-stone-50 font-bold text-xs shadow-sm"
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="text-xs font-bold text-stone-900 w-4 text-center font-mono">{c.quantity}</span>
+                        <button 
+                          type="button"
+                          onClick={() => updateCartQuantity(c.id, 1)}
+                          className="w-7 h-7 bg-white text-stone-900 flex items-center justify-center hover:bg-stone-50 font-bold text-xs shadow-sm"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Item special notes */}
+                    <div className="mt-2 flex items-center gap-1.5">
+                      <FileText className="w-3 h-3 text-stone-400 shrink-0" />
+                      <input 
+                        type="text" 
+                        placeholder="Add special notes (e.g. no onions, extra spicy)..."
+                        value={c.notes}
+                        onChange={(e) => updateCartNotes(c.id, e.target.value)}
+                        className="w-full text-xs text-stone-600 bg-stone-50 border-b border-transparent focus:border-orange-600 focus:outline-none py-1 font-mono"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Customer Details Form */}
+              <div className="border-t border-stone-200 pt-4 space-y-3">
+                <h4 className="font-black text-xs text-stone-900 uppercase tracking-wider mb-2">Customer Details</h4>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1">Your Name</label>
+                    <input 
+                      type="text" 
+                      required
+                      placeholder="Enter name"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className="w-full text-xs bg-stone-50 border border-stone-300 p-2.5 focus:outline-none focus:border-orange-600 rounded-none font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1">Phone Number</label>
+                    <input 
+                      type="tel" 
+                      placeholder="e.g. 081234..."
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      className="w-full text-xs bg-stone-50 border border-stone-300 p-2.5 focus:outline-none focus:border-orange-600 rounded-none font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1">Dining Option</label>
+                  <select 
+                    value={orderType}
+                    onChange={(e) => setOrderType(e.target.value as "dine-in" | "take-away")}
+                    className="w-full text-xs bg-stone-50 border border-stone-300 p-2.5 focus:outline-none focus:border-orange-600 rounded-none font-mono font-bold"
+                  >
+                    <option value="dine-in">🍽️ Dine-in</option>
+                    <option value="take-away">🛍️ Takeaway</option>
+                  </select>
+                </div>
+
+                {/* Price Breakdown */}
+                <div className="bg-stone-100 p-4 mt-4 space-y-2 text-xs border border-stone-200">
+                  <div className="flex justify-between text-stone-600">
+                    <span>Subtotal</span>
+                    <span className="font-mono">Rp {subtotal.toLocaleString("id-ID")}</span>
+                  </div>
+                  <div className="flex justify-between text-stone-600">
+                    <span>Tax ({Math.round(branchTaxRate * 100)}%)</span>
+                    <span className="font-mono">Rp {taxAmount.toLocaleString("id-ID")}</span>
+                  </div>
+                  <div className="flex justify-between font-black text-sm text-stone-900 border-t border-dashed border-stone-300 pt-2 mt-2">
+                    <span>Total Amount</span>
+                    <span className="font-mono text-orange-600">Rp {totalAmount.toLocaleString("id-ID")}</span>
+                  </div>
+                </div>
+
+                {errorMessage && (
+                  <div className="p-3 bg-red-50 text-red-700 text-xs rounded-none border border-red-200 font-mono">
+                    {errorMessage}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Pinned Footer */}
+            <div className="bg-white border-t border-stone-200 p-4 shrink-0 z-10">
+              <button
+                type="submit"
+                disabled={isSubmittingOrder}
+                className="w-full py-3.5 bg-orange-600 hover:bg-orange-700 disabled:bg-stone-300 disabled:text-stone-500 text-white font-bold text-sm uppercase tracking-wider rounded-none shadow-md active:scale-[0.98] transition-all"
+              >
+                {isSubmittingOrder ? "Placing Order..." : `Send Order • Rp ${totalAmount.toLocaleString("id-ID")}`}
+              </button>
+            </div>
+          </form>
+      </Modal>
+
       {/* ADD ITEM POPUP */}
-      {activePopupItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fade-in">
-          <div className="bg-white w-full max-w-md rounded-[24px] overflow-hidden flex flex-col shadow-2xl text-stone-900 border border-stone-150 relative animate-slide-up max-h-[92vh]">
+      <Modal
+        isOpen={!!activePopupItem}
+        onClose={() => setActivePopupItem(null)}
+        backdropClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fade-in"
+        className="w-full max-w-md"
+      >
+        {activePopupItem && (
+          <div className="bg-white w-full rounded-[24px] overflow-hidden flex flex-col shadow-2xl text-stone-900 border border-stone-150 relative animate-slide-up max-h-[92vh]">
             
             {/* Header Image Section */}
             <div className="h-52 w-full overflow-hidden shrink-0 bg-stone-100 relative">
@@ -842,10 +867,9 @@ export default function CustomerApp({ branchNameQuery, tableNumberQuery }: Custo
                 <span>Add to Basket - Rp {(activePopupItem.price_normal * popupQuantity).toLocaleString("id-ID")} (Incl. tax)</span>
               </button>
             </div>
-
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 }

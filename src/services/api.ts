@@ -355,4 +355,34 @@ export class ApiService {
       body: JSON.stringify(promo)
     });
   }
+
+  // --- Users Management ---
+  static async getUsers(branchName?: string): Promise<User[]> {
+    const params = new URLSearchParams();
+    if (branchName) params.append("branch_name", branchName);
+    const qs = params.toString();
+    return this.request<User[]>(`/users/${qs ? `?${qs}` : ""}`);
+  }
+
+  static async createUser(userData: any): Promise<User> {
+    return this.request<User>("/users/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(userData)
+    });
+  }
+
+  static async updateUserPassword(userId: number, newPassword: string): Promise<void> {
+    return this.request<void>(`/users/${userId}/password`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ new_password: newPassword })
+    });
+  }
+
+  static async deleteUser(userId: number): Promise<void> {
+    return this.request<void>(`/users/${userId}`, {
+      method: "DELETE"
+    });
+  }
 }

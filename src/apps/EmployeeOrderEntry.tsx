@@ -15,7 +15,8 @@ export default function EmployeeOrderEntry({ currentBranch, onOrderPlaced }: Emp
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(true);
   
-  const [orderType, setOrderType] = useState<"dine-in" | "GoFood" | "GrabFood" | "ShopeeFood">("GoFood");
+  const [orderType, setOrderType] = useState<"dine-in" | "GoFood" | "GrabFood" | "ShopeeFood">("dine-in");
+  const [fulfillmentType, setFulfillmentType] = useState<"dine-in" | "takeaway">("dine-in");
   const [tableNumber, setTableNumber] = useState<number>(0);
   const [customerName, setCustomerName] = useState<string>("");
   
@@ -58,15 +59,18 @@ export default function EmployeeOrderEntry({ currentBranch, onOrderPlaced }: Emp
   const filteredMenu = menuItems.filter(item => {
     if (item.category.toLowerCase() === 'master') return false;
     if (categoryFilter !== 'all' && item.category !== categoryFilter) return false;
-    if (searchQuery && !item.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    if (searchQuery) {
+      return item.name.toLowerCase().includes(searchQuery.toLowerCase());
+    }
     return true;
   });
 
   const addToCart = (item: MenuItem) => {
-    const existingIndex = cart.findIndex(c => c.item.id === item.id && c.notes === "");
-    if (existingIndex > -1) {
-      const updated = [...cart];
-      updated[existingIndex].quantity += 1;
+    const existing = cart.find(c => c.item.id === item.id);
+    if (existing) {
+      const updated = cart.map(c => 
+        c.item.id === item.id ? { ...c, quantity: c.quantity + 1 } : c
+      );
       setCart(updated);
     } else {
       setCart([...cart, { 
@@ -91,17 +95,17 @@ export default function EmployeeOrderEntry({ currentBranch, onOrderPlaced }: Emp
 
   const handleSubmit = async () => {
     if (cart.length === 0) return;
-    if (orderType === "dine-in" && tableNumber <= 0) {
+    if (orderType === "dine-in" && fulfillmentType === "dine-in" && tableNumber <= 0) {
       alert("Please enter a valid table number.");
       return;
     }
     try {
       setIsSubmitting(true);
       const payload: OrderInput = {
-        table_number: orderType === "dine-in" ? tableNumber : 0,
+        table_number: (orderType === "dine-in" && fulfillmentType === "dine-in") ? tableNumber : 0,
         customer_name: customerName,
         phone_number: "Online",
-        order_type: orderType,
+        order_type: orderType === "dine-in" ? fulfillmentType : orderType,
         branch_name: currentBranch,
         items: cart.map(c => ({
           menu_item_id: c.item.id,
@@ -139,7 +143,7 @@ export default function EmployeeOrderEntry({ currentBranch, onOrderPlaced }: Emp
                 onChange={(e) => setOrderType(e.target.value as any)}
                 className="bg-stone-900 text-white font-bold text-xs px-3 py-1.5 uppercase tracking-wider border-none focus:ring-0"
               >
-                <option value="dine-in">Dine-In (Normal)</option>
+                <option value="dine-in">Dine/Take</option>
                 <option value="GoFood">GoFood</option>
                 <option value="GrabFood">GrabFood</option>
                 <option value="ShopeeFood">ShopeeFood</option>
@@ -219,9 +223,9 @@ export default function EmployeeOrderEntry({ currentBranch, onOrderPlaced }: Emp
         <div className="p-4 border-b border-stone-800 flex justify-between items-center">
           <h3 className="font-black text-sm uppercase tracking-wider flex items-center gap-2">
             <span>Current Ticket</span>
-            <span className="bg-orange-600 px-2 py-0.5 text-[10px]">{orderType}</span>
+            <span className="bg-orange-600 px-2 py-0.5 text-[10px]">{orderType === "dine-in" ? "DINE/TAKE" : orderType}</span>
           </h3>
-          {orderType === "dine-in" && (
+          {orderType === "dine-in" && fulfillmentType === "dine-in" && (
             <div className="flex items-center gap-2">
               <label className="text-[10px] font-bold text-stone-400 tracking-wider">TABLE:</label>
               <input type="number" min="1" value={tableNumber || ''} onChange={e => setTableNumber(parseInt(e.target.value) || 0)} className="bg-stone-800 border border-stone-700 text-white w-12 px-2 py-1 text-xs text-center font-mono focus:border-orange-500 focus:outline-none" />
@@ -230,6 +234,19 @@ export default function EmployeeOrderEntry({ currentBranch, onOrderPlaced }: Emp
         </div>
         
         <div className="px-4 py-2 bg-stone-800 border-b border-stone-700 flex flex-col gap-2">
+          {orderType === "dine-in" && (
+            <div className="flex items-center gap-2">
+              <label className="text-[10px] font-bold text-stone-400 tracking-wider whitespace-nowrap">TYPE:</label>
+              <select 
+                value={fulfillmentType} 
+                onChange={e => setFulfillmentType(e.target.value as any)} 
+                className="bg-stone-900 border border-stone-700 text-white w-full px-2 py-1 text-xs font-mono focus:border-orange-500 focus:outline-none uppercase"
+              >
+                <option value="dine-in">Dine-In</option>
+                <option value="takeaway">Takeaway</option>
+              </select>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <label className="text-[10px] font-bold text-stone-400 tracking-wider whitespace-nowrap">CUSTOMER:</label>
             <input 
