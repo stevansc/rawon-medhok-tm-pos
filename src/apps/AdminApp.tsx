@@ -46,7 +46,7 @@ function SortableMenuItem({ item, onToggleAvailability, onEdit, onDelete, branch
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const itemStock = item.stock_count ?? 0;
+  const itemStock = item.stock_count === null || item.stock_count === undefined ? '∞' : item.stock_count;
   const itemCost = item.cost ?? Math.round(item.price_normal * 0.5);
   const grossProfit = item.price_normal - itemCost;
   const grossMarginPercent = item.price_normal > 0 ? Math.round((grossProfit / item.price_normal) * 100) : 0;
@@ -611,7 +611,7 @@ export default function AdminApp() {
     setMenuFormBranch(item.branch_name);
     setMenuFormAvailable(item.is_available);
     setMenuFormImage(item.image_url);
-    setMenuFormStock(item.stock_count !== undefined ? item.stock_count.toString() : "0");
+    setMenuFormStock((item.stock_count ?? 0).toString());
     setMenuFormCost(item.cost !== undefined ? item.cost.toString() : Math.round(item.price_normal * 0.5).toString());
     setMenuFormAddons(item.addons ? item.addons.join(", ") : "");
     setMenuFormIngredients(item.ingredients ? item.ingredients.map(ing => ({
@@ -754,7 +754,7 @@ export default function AdminApp() {
       </header>
 
       {/* Tabs navigation */}
-      <div className="bg-stone-900 px-6 border-b border-stone-850 flex gap-4 shrink-0 text-white">
+      <div className="bg-stone-900 px-6 border-b border-stone-850 flex gap-4 shrink-0 text-white overflow-x-auto scrollbar-hide">
         {[
           { id: "dashboard", label: "📈 Dashboard Analytics" },
           { id: "transactions", label: "🧾 Transactions Detail" },
@@ -768,7 +768,7 @@ export default function AdminApp() {
               setActiveTab(tab.id as any);
               setEditingMenuItem(null);
             }}
-            className={`py-3.5 px-1 border-b-2 font-bold text-xs uppercase tracking-wider transition-all rounded-none ${
+            className={`py-3.5 px-1 border-b-2 font-bold text-xs uppercase tracking-wider transition-all rounded-none whitespace-nowrap shrink-0 ${
               activeTab === tab.id
                 ? "border-orange-500 text-orange-500 font-black"
                 : "border-transparent text-stone-400 hover:text-stone-200"

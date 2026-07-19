@@ -131,7 +131,7 @@ def get_menu(
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     query = db.query(models.MenuItem).options(
         joinedload(models.MenuItem.ingredients).joinedload(models.MenuItemIngredient.ingredient)
-    )
+    ).filter(models.MenuItem.category != "Deleted")
     if branch_name:
         query = query.filter(models.MenuItem.branch_name == branch_name)
     if category:
@@ -221,7 +221,8 @@ def delete_menu_item(item_id: int, db: Session = Depends(get_db), current_user: 
     db_item = db.query(models.MenuItem).filter(models.MenuItem.id == item_id).first()
     if not db_item:
         raise HTTPException(status_code=404, detail="Menu item not found")
-    db.delete(db_item)
+    db_item.category = "Deleted"
+    db_item.is_available = False
     db.commit()
     return {"message": "Deleted"}
 

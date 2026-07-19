@@ -175,7 +175,7 @@ export default function EmployeeOrderEntry({ currentBranch, onOrderPlaced }: Emp
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredMenu.map(item => {
-                const isOutOfStock = !item.is_available || item.stock_count <= 0;
+                const isOutOfStock = !item.is_available || (item.stock_count !== null && item.stock_count <= 0);
                 return (
                 <div key={item.id} onClick={() => !isOutOfStock && addToCart(item)} className={`bg-white border-2 p-3 flex flex-col justify-between transition-colors group relative shadow-sm ${isOutOfStock ? 'border-stone-200 opacity-50 cursor-not-allowed' : 'border-stone-200 hover:border-stone-900 cursor-pointer hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,0.9)]'}`}>
                   {isOutOfStock && <div className="absolute inset-0 z-10 flex items-center justify-center font-black text-red-600 uppercase tracking-widest text-lg transform -rotate-12 backdrop-blur-[1px]">Out of Stock</div>}
@@ -185,9 +185,27 @@ export default function EmployeeOrderEntry({ currentBranch, onOrderPlaced }: Emp
                   </div>
                   <div className="mt-3 flex justify-between items-center">
                     <span className="font-black text-stone-900 font-mono">Rp {getPrice(item).toLocaleString('id-ID')}</span>
-                    <button className={`p-1.5 transition-colors ${isOutOfStock ? 'bg-stone-100 text-stone-400' : 'bg-stone-100 group-hover:bg-orange-100 text-stone-600 group-hover:text-orange-600'}`}>
-                      <Plus className="w-4 h-4" />
-                    </button>
+                    {(() => {
+                      const cartItem = cart.find(c => c.item.id === item.id);
+                      if (cartItem) {
+                        return (
+                          <div className="flex items-center bg-stone-900 text-white rounded-none border border-stone-900" onClick={(e) => e.stopPropagation()}>
+                            <button onClick={() => updateQuantity(cartItem.id, -1)} className="p-1.5 hover:text-orange-500 transition-colors">
+                              <Minus className="w-3.5 h-3.5" />
+                            </button>
+                            <span className="font-bold text-xs w-6 text-center font-mono">{cartItem.quantity}</span>
+                            <button onClick={() => updateQuantity(cartItem.id, 1)} className="p-1.5 hover:text-orange-500 transition-colors">
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        );
+                      }
+                      return (
+                        <button className={`p-1.5 transition-colors border border-stone-900 ${isOutOfStock ? 'bg-stone-100 text-stone-400' : 'bg-white hover:bg-stone-900 hover:text-white text-stone-900'}`}>
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
               )})}
